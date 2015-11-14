@@ -9,24 +9,6 @@
 module argparse;
 
 /**
- * Specifies that an option is not optional.
- */
-enum Required;
-
-/**
- * User defined attribute for an option.
- */
-struct Opt
-{
-    string[] names;
-
-    this(string[] names...)
-    {
-        this.names = names;
-    }
-}
-
-/**
  * Generic argument parsing exception.
  */
 class ArgParseException : Exception
@@ -38,9 +20,27 @@ class ArgParseException : Exception
 }
 
 /**
+ * Specifies that an option is not optional.
+ */
+enum Required;
+
+/**
+ * User defined attribute for an option.
+ */
+struct Option
+{
+    string[] names;
+
+    this(string[] names...)
+    {
+        this.names = names;
+    }
+}
+
+/**
  * User defined attribute for a positional argument.
  */
-struct Arg
+struct Argument
 {
     /**
      * Name of the argument. Since this is a positional argument, this value is
@@ -98,26 +98,26 @@ struct Arg
 
 unittest
 {
-    with (Arg("lion"))
+    with (Argument("lion"))
     {
         assert(name == "lion");
         assert(lowerBound == 1);
         assert(upperBound == 1);
     }
 
-    with (Arg("tiger", '?'))
+    with (Argument("tiger", '?'))
     {
         assert(lowerBound == 0);
         assert(upperBound == 1);
     }
 
-    with (Arg("bear", '+'))
+    with (Argument("bear", '+'))
     {
         assert(lowerBound == 1);
         assert(upperBound == size_t.max);
     }
 
-    with (Arg("dinosaur", '*'))
+    with (Argument("dinosaur", '*'))
     {
         assert(lowerBound == 0);
         assert(upperBound == size_t.max);
@@ -128,10 +128,10 @@ unittest
 {
     import std.exception : collectException;
 
-    assert(collectException!ArgParseException(Arg("fails", 'q')));
-    assert(!collectException!ArgParseException(Arg("success", '?')));
-    assert(!collectException!ArgParseException(Arg("success", '*')));
-    assert(!collectException!ArgParseException(Arg("success", '+')));
+    assert(collectException!ArgParseException(Argument("fails", 'q')));
+    assert(!collectException!ArgParseException(Argument("success", '?')));
+    assert(!collectException!ArgParseException(Argument("success", '*')));
+    assert(!collectException!ArgParseException(Argument("success", '+')));
 }
 
 /**
@@ -177,7 +177,7 @@ class ArgParseError : Exception
  *
  * Returns: Options structure filled out with values.
  *
- * Throws: ArgParseError if arguments are invalid.
+ * Throws: ArgParseException if arguments are invalid.
  */
 Options parseArgs(Options)(string[] args) pure
 {
@@ -191,29 +191,29 @@ unittest
 {
     struct Options
     {
-        @Opt("help")
+        @Option("help")
             @Help("Prints help on command line arguments.")
             bool help;
 
-        @Arg("path", 'q')
+        @Argument("path", 'q')
             @Help("Path to the build description.")
             string path;
 
-        @Opt("dryrun", "n")
+        @Option("dryrun", "n")
             @Help("Don't make any functional changes. Just print what might"
                   " happen.")
             bool dryRun;
 
-        @Opt("threads", "j")
+        @Option("threads", "j")
             @Help("The number of threads to use. Default is the number of"
                   " logical cores.")
             string threads;
 
-        @Opt("color")
+        @Option("color")
             @Help("When to colorize the output.")
             string color = "auto";
 
-        @Opt("add")
+        @Option("add")
             @Required
             @Help("Adds the given number to a running total.")
             void add(string num)
