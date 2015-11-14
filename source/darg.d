@@ -6,7 +6,7 @@
  * Description:
  * Parses arguments.
  */
-module util.argparse;
+module argparse;
 
 /**
  * Specifies that an option is not optional.
@@ -23,6 +23,17 @@ struct Opt
     this(string[] names...)
     {
         this.names = names;
+    }
+}
+
+/**
+ * Generic argument parsing exception.
+ */
+class ArgParseException : Exception
+{
+    this(string msg) pure nothrow
+    {
+        super(msg);
     }
 }
 
@@ -55,11 +66,14 @@ struct Arg
         this.upperBound = upperBound;
     }
 
-    this(string name, char nargs) pure nothrow
+    /**
+     * Convenience constructor with an argument multiplicity specifier.
+     */
+    this(string name, char multiplicity) pure
     {
         this.name = name;
 
-        switch (nargs)
+        switch (multiplicity)
         {
             case '?':
                 this.lowerBound = 0;
@@ -74,7 +88,10 @@ struct Arg
                 this.upperBound = size_t.max;
                 break;
             default:
-                assert(false, "nargs must be either '?', '*', or '+'");
+                throw new ArgParseException(
+                        "Invalid argument multiplicity specifier:"
+                        " must be either '?', '*', or '+'"
+                        );
         }
     }
 }
@@ -105,6 +122,16 @@ unittest
         assert(lowerBound == 0);
         assert(upperBound == size_t.max);
     }
+}
+
+unittest
+{
+    import std.exception : collectException;
+
+    assert(collectException!ArgParseException(Arg("fails", 'q')));
+    assert(!collectException!ArgParseException(Arg("success", '?')));
+    assert(!collectException!ArgParseException(Arg("success", '*')));
+    assert(!collectException!ArgParseException(Arg("success", '+')));
 }
 
 /**
