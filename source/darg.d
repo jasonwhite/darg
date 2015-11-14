@@ -79,6 +79,34 @@ struct Arg
     }
 }
 
+unittest
+{
+    with (Arg("lion"))
+    {
+        assert(name == "lion");
+        assert(lowerBound == 1);
+        assert(upperBound == 1);
+    }
+
+    with (Arg("tiger", '?'))
+    {
+        assert(lowerBound == 0);
+        assert(upperBound == 1);
+    }
+
+    with (Arg("bear", '+'))
+    {
+        assert(lowerBound == 1);
+        assert(upperBound == size_t.max);
+    }
+
+    with (Arg("dinosaur", '*'))
+    {
+        assert(lowerBound == 0);
+        assert(upperBound == size_t.max);
+    }
+}
+
 /**
  * Help string for an option or positional argument.
  */
@@ -140,7 +168,7 @@ unittest
             @Help("Prints help on command line arguments.")
             bool help;
 
-        @Arg("path", '?')
+        @Arg("path", 'q')
             @Help("Path to the build description.")
             string path;
 
