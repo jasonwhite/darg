@@ -325,16 +325,27 @@ unittest
 }
 
 /**
+ * Checks if the given type is an option handler.
+ */
+private enum isOptionHandler(T) =
+    is(typeof({
+        T handler;
+        handler();
+    }));
+
+/**
  * Check if the given type is valid for an option.
  */
 private template isValidOptionType(T)
 {
     import std.traits : isBasicType, isSomeString;
 
+    // FIXME: Allow OptionHandler and ArgumentHandler to have attributes
+
     static if (isBasicType!T ||
                isSomeString!T ||
-               is(T == OptionHandler) ||
-               is(T == ArgumentHandler)
+               is(T : OptionHandler) ||
+               is(T : ArgumentHandler)
         )
     {
         enum isValidOptionType = true;
@@ -447,6 +458,15 @@ T parseArg(T)(string arg) pure
     }
 }
 
+unittest
+{
+    import std.exception : ce = collectException;
+
+    assert(parseArg!int("42") == 42);
+    assert(parseArg!string("42") == "42");
+    assert(ce!ArgParseException(parseArg!size_t("-42")));
+}
+
 /**
  * Parses options from the given list of arguments. Note that the first argument
  * is assumed to be the program name and is ignored.
@@ -455,7 +475,7 @@ T parseArg(T)(string arg) pure
  *
  * Throws: ArgParseException if arguments are invalid.
  */
-Options parseArgs(Options)(string[] args) pure
+Options parseArgs(Options)(string[] args)
     if (is(Options == struct))
 {
     import std.traits;
@@ -511,7 +531,42 @@ Options parseArgs(Options)(string[] args) pure
                     {
                         parsed[i] = true;
 
-                        debug writeln(name);
+                        static if (hasArgument!(typeof(symbol)))
+                        {
+                            ++i;
+
+                            if (i >= args.length || isOption(args[i]))
+                                throw new ArgParseException(
+                                        "Expected argument for option '%s'"
+                                        .format(args[i-1])
+                                        );
+
+                            static if (is(typeof(symbol) : ArgumentHandler))
+                            {
+                                __traits(getMember, options, member)(args[i]);
+                            }
+                            else
+                            {
+                                __traits(getMember, options, member) =
+                                    parseArg!(typeof(symbol))(args[i]);
+                            }
+
+                            parsed[i] = true;
+                        }
+                        else
+                        {
+                            static if (is(typeof(symbol) : OptionHandler))
+                            {
+                                __traits(getMember, options, member)();
+                            }
+                            else if (is(typeof(symbol) : OptionFlag))
+                            {
+                                __traits(getMember, options, member) =
+                                    OptionFlag.yes;
+                            }
+                        }
+
+                        //debug writeln(typeof(symbol).stringof);
                     }
                 }
             }
@@ -526,11 +581,12 @@ unittest
 {
     static struct Options
     {
+        string testValue;
+
         @Option("test")
         void test(string arg)
         {
-            import std.stdio;
-            writeln(arg);
+            testValue = arg;
         }
 
         @Option("help")
@@ -557,11 +613,15 @@ unittest
     }
 
     immutable options = parseArgs!Options(
-            ["myprogram", "blah", "--dryrun", "--threads"]
+            ["myprogram", "blah", "--help", "--test", "test test", "--dryrun", "--threads", "42"]
             );
 
-    import std.stdio;
-
-    writeln(options);
+    assert(options == Options(
+            "test test",
+            OptionFlag.yes,
+            null,
+            OptionFlag.yes,
+            42,
+            "auto",
+            ));
 }
-
