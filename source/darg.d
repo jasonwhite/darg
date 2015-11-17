@@ -542,31 +542,23 @@ Options parseArgs(Options)(string[] args)
                                         );
 
                             static if (is(typeof(symbol) : ArgumentHandler))
-                            {
                                 __traits(getMember, options, member)(args[i]);
-                            }
                             else
-                            {
                                 __traits(getMember, options, member) =
                                     parseArg!(typeof(symbol))(args[i]);
-                            }
 
                             parsed[i] = true;
                         }
                         else
                         {
                             static if (is(typeof(symbol) : OptionHandler))
-                            {
                                 __traits(getMember, options, member)();
-                            }
-                            else if (is(typeof(symbol) : OptionFlag))
-                            {
+                            else static if (is(typeof(symbol) : OptionFlag))
                                 __traits(getMember, options, member) =
                                     OptionFlag.yes;
-                            }
+                            else
+                                static assert(false);
                         }
-
-                        //debug writeln(typeof(symbol).stringof);
                     }
                 }
             }
