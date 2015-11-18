@@ -565,12 +565,68 @@ Options parseArgs(Options)(string[] args)
         }
     }
 
+    // FIXME: Any unhandled options here are erroneous.
+
+    // Only positional arguments are left
+    size_t j = 0;
+    foreach (member; __traits(allMembers, Options))
+    {
+        alias symbol = Identity!(__traits(getMember, options, member));
+        alias argUDAs = getUDAs!(symbol, Argument);
+
+        static if (argUDAs.length > 0)
+        {
+            // Keep consuming arguments until the multiplicity is satisfied
+            for (size_t i = 0; i < argUDAs[0].upperBound; ++i)
+            {
+                // Find the next unparsed option.
+                while (j < parsed.length && parsed[j])
+                    ++j;
+
+                if (j == parsed.length)
+                {
+                    // Out of arguments.
+                    if (i >= argUDAs[0].lowerBound)
+                        break; // But multiplicity is satisfied
+
+                    throw new ArgParseException(
+                        "Missing '"~ member ~"' argument"
+                        );
+                }
+
+                // Set argument or add to list of arguments.
+                static if (argUDAs[0].upperBound <= 2)
+                {
+                    static if (is(typeof(symbol) : ArgumentHandler))
+                        __traits(getMember, options, member)(args[j]);
+                    else
+                        __traits(getMember, options, member) =
+                            parseArg!(typeof(symbol))(args[j]);
+                }
+                else
+                {
+                    static if (is(typeof(symbol) : ArgumentHandler))
+                        __traits(getMember, options, member)(args[i]);
+                    else
+                        __traits(getMember, options, member) ~=
+                            parseArg!(typeof(symbol))(args[i]);
+                }
+
+                parsed[j] = true;
+            }
+        }
+    }
+
+    // FIXME: Any unhandled arguments here are erroneous.
+
     return options;
 }
 
 /// Ditto
 unittest
 {
+    debug import std.stdio;
+
     static struct Options
     {
         string testValue;
@@ -585,9 +641,9 @@ unittest
         @Help("Prints help on command line arguments.")
         OptionFlag help;
 
-        @Argument("path")
+        @Argument("path", 2, 3)
         @Help("Path to the build description.")
-        string path;
+        string[] path;
 
         @Option("dryrun", "n")
         @Help("Don't make any functional changes. Just print what might"
@@ -604,14 +660,17 @@ unittest
         string color = "auto";
     }
 
-    immutable options = parseArgs!Options(
-            ["myprogram", "blah", "--help", "--test", "test test", "--dryrun", "--threads", "42"]
+    auto options = parseArgs!Options(
+            ["myprogram", "blah1", "--help", "--test", "test test", "--dryrun",
+            "--threads", "42", "blah2"]
             );
+
+    debug writeln(options);
 
     assert(options == Options(
             "test test",
             OptionFlag.yes,
-            null,
+            ["blah"],
             OptionFlag.yes,
             42,
             "auto",
