@@ -533,6 +533,7 @@ Options parseArgs(Options)(string[] args)
 
                         static if (hasArgument!(typeof(symbol)))
                         {
+                            // FIXME: Handle '=' arguments
                             ++i;
 
                             if (i >= args.length || isOption(args[i]))
@@ -565,7 +566,16 @@ Options parseArgs(Options)(string[] args)
         }
     }
 
-    // FIXME: Any unhandled options here are erroneous.
+    // Any left over options are erroneous
+    for (size_t i = 0; i < args.length; ++i)
+    {
+        if (!parsed[i] && isOption(args[i]))
+        {
+            throw new ArgParseException(
+                "Invalid option '"~ args[i] ~"'"
+                );
+        }
+    }
 
     // Only positional arguments are left
     size_t j = 0;
@@ -606,10 +616,13 @@ Options parseArgs(Options)(string[] args)
                 else
                 {
                     static if (is(typeof(symbol) : ArgumentHandler))
-                        __traits(getMember, options, member)(args[i]);
+                        __traits(getMember, options, member)(args[j]);
                     else
+                    {
+                        import std.range.primitives : ElementType;
                         __traits(getMember, options, member) ~=
-                            parseArg!(typeof(symbol))(args[i]);
+                            parseArg!(ElementType!(typeof(symbol)))(args[j]);
+                    }
                 }
 
                 parsed[j] = true;
@@ -660,17 +673,24 @@ unittest
         string color = "auto";
     }
 
-    auto options = parseArgs!Options(
-            ["myprogram", "blah1", "--help", "--test", "test test", "--dryrun",
-            "--threads", "42", "blah2"]
-            );
+    auto options = parseArgs!Options([
+            "myprogram",
+            "blah1",
+            "--help",
+            "--test",
+            "test test",
+            "--dryrun",
+            "--threads",
+            "42",
+            "blah2",
+        ]);
 
     debug writeln(options);
 
     assert(options == Options(
             "test test",
             OptionFlag.yes,
-            ["blah"],
+            ["blah1", "blah2"],
             OptionFlag.yes,
             42,
             "auto",
