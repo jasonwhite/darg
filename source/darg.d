@@ -265,6 +265,7 @@ unittest
     static assert(!isLongOption("--"));
     static assert( isLongOption("--a"));
     static assert( isLongOption("--arg"));
+    static assert( isLongOption("--arg=asdf"));
 }
 
 /**
@@ -274,6 +275,35 @@ unittest
 private bool isOption(string arg) pure nothrow
 {
     return isShortOption(arg) || isLongOption(arg);
+}
+
+private static struct OptionSplit
+{
+    string head;
+    string tail;
+}
+
+/**
+ * Split option.
+ */
+private auto splitOption(string option) pure
+{
+
+    size_t i = 0;
+    while (i < option.length && option[i] != '=')
+        ++i;
+
+    return OptionSplit(
+            option[0 .. i],
+            (i < option.length) ? option[i+1 .. $] : null
+            );
+}
+
+unittest
+{
+    static assert(splitOption("--foo") == OptionSplit("--foo", null));
+    static assert(splitOption("--foo=") == OptionSplit("--foo", ""));
+    static assert(splitOption("--foo=bar") == OptionSplit("--foo", "bar"));
 }
 
 /**
@@ -518,7 +548,9 @@ Options parseArgs(Options)(string[] args)
 
     for (size_t i = 0; i < args.length; ++i)
     {
-        if (immutable name = optionToName(args[i]))
+        auto s = splitOption(args[i]);
+
+        if (immutable name = optionToName(s.head))
         {
             foreach (member; __traits(allMembers, Options))
             {
@@ -534,24 +566,41 @@ Options parseArgs(Options)(string[] args)
                         static if (hasArgument!(typeof(symbol)))
                         {
                             // FIXME: Handle '=' arguments
-                            ++i;
-
-                            if (i >= args.length || isOption(args[i]))
-                                throw new ArgParseException(
-                                        "Expected argument for option '%s'"
-                                        .format(args[i-1])
-                                        );
-
-                            static if (is(typeof(symbol) : ArgumentHandler))
-                                __traits(getMember, options, member)(args[i]);
+                            if (s.tail)
+                            {
+                                static if (is(typeof(symbol) : ArgumentHandler))
+                                    __traits(getMember, options, member)(s.tail);
+                                else
+                                    __traits(getMember, options, member) =
+                                        parseArg!(typeof(symbol))(s.tail);
+                            }
                             else
-                                __traits(getMember, options, member) =
-                                    parseArg!(typeof(symbol))(args[i]);
+                            {
+                                ++i;
 
-                            parsed[i] = true;
+                                if (i >= args.length || isOption(args[i]))
+                                    throw new ArgParseException(
+                                            "Expected argument for option '%s'"
+                                            .format(s.head)
+                                            );
+
+                                static if (is(typeof(symbol) : ArgumentHandler))
+                                    __traits(getMember, options, member)(args[i]);
+                                else
+                                    __traits(getMember, options, member) =
+                                        parseArg!(typeof(symbol))(args[i]);
+
+                                parsed[i] = true;
+                            }
                         }
                         else
                         {
+                            if (s.tail)
+                                throw new ArgParseException(
+                                        "Option '%s' does not take an argument"
+                                        .format(s.head)
+                                        );
+
                             static if (is(typeof(symbol) : OptionHandler))
                                 __traits(getMember, options, member)();
                             else static if (is(typeof(symbol) : OptionFlag))
@@ -682,6 +731,7 @@ unittest
             "--dryrun",
             "--threads",
             "42",
+            "--color=test",
             "blah2",
         ]);
 
@@ -693,6 +743,6 @@ unittest
             ["blah1", "blah2"],
             OptionFlag.yes,
             42,
-            "auto",
+            "test",
             ));
 }
