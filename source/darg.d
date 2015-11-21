@@ -201,8 +201,8 @@ struct Help
 /**
  * Function signatures that can handle arguments or options.
  */
-private alias void OptionHandler();
-private alias void ArgumentHandler(string); /// Ditto
+private alias void OptionHandler() pure;
+private alias void ArgumentHandler(string) pure; /// Ditto
 
 /**
  * Constructs a printable usage string at compile time from the given options
@@ -399,15 +399,19 @@ unittest
     static assert(isValidOptionType!string);
     static assert(isValidOptionType!(int[]));
 
-    alias void Func1();
-    alias void Func2(string);
+    alias void Func1() pure;
+    alias void Func2(string) pure;
     alias int Func3();
     alias int Func4(string);
+    alias void Func5();
+    alias void Func6(string);
 
     static assert(isValidOptionType!Func1);
     static assert(isValidOptionType!Func2);
     static assert(!isValidOptionType!Func3);
     static assert(!isValidOptionType!Func4);
+    static assert(!isValidOptionType!Func5);
+    static assert(!isValidOptionType!Func6);
 }
 
 /**
@@ -694,7 +698,7 @@ unittest
         string testValue;
 
         @Option("test")
-        void test(string arg)
+        void test(string arg) pure
         {
             testValue = arg;
         }
