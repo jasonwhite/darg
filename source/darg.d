@@ -583,9 +583,9 @@ Options parseArgs(Options)(string[] args)
 
     for (size_t i = 0; i < args.length; ++i)
     {
-        auto s = splitOption(args[i]);
+        auto option = splitOption(args[i]);
 
-        if (immutable name = optionToName(s.head))
+        if (immutable name = optionToName(option.head))
         {
             foreach (member; __traits(allMembers, Options))
             {
@@ -601,13 +601,13 @@ Options parseArgs(Options)(string[] args)
                         static if (hasArgument!(typeof(symbol)))
                         {
                             // FIXME: Handle '=' arguments
-                            if (s.tail)
+                            if (option.tail)
                             {
                                 static if (is(typeof(symbol) : ArgumentHandler))
-                                    __traits(getMember, options, member)(s.tail);
+                                    __traits(getMember, options, member)(option.tail);
                                 else
                                     __traits(getMember, options, member) =
-                                        parseArg!(typeof(symbol))(s.tail);
+                                        parseArg!(typeof(symbol))(option.tail);
                             }
                             else
                             {
@@ -616,7 +616,7 @@ Options parseArgs(Options)(string[] args)
                                 if (i >= args.length || isOption(args[i]))
                                     throw new ArgParseException(
                                             "Expected argument for option '%s'"
-                                            .format(s.head)
+                                            .format(option.head)
                                             );
 
                                 static if (is(typeof(symbol) : ArgumentHandler))
@@ -630,10 +630,10 @@ Options parseArgs(Options)(string[] args)
                         }
                         else
                         {
-                            if (s.tail)
+                            if (option.tail)
                                 throw new ArgParseException(
                                         "Option '%s' does not take an argument"
-                                        .format(s.head)
+                                        .format(option.head)
                                         );
 
                             static if (is(typeof(symbol) : OptionHandler))
