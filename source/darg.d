@@ -9,6 +9,7 @@
  * TODO:
  *  - Generate help strings
  *  - Support sub-commands
+ *  - Handle enumeration types
  */
 module argparse;
 
@@ -282,11 +283,10 @@ private static struct OptionSplit
 }
 
 /**
- * Split option.
+ * Splits an option on "=".
  */
 private auto splitOption(string option) pure
 {
-
     size_t i = 0;
     while (i < option.length && option[i] != '=')
         ++i;
@@ -322,19 +322,18 @@ private auto splitArgs(const(string)[] args) pure
 
     return ArgSplit(
             args[0 .. i],
-            (i < args.length) ? args[i+1 .. $] : null
+            (i < args.length) ? args[i+1 .. $] : []
             );
 }
 
 unittest
 {
-    static assert(splitArgs([]) == ArgSplit([], null));
-    static assert(splitArgs(["a", "b"]) == ArgSplit(["a", "b"], null));
+    static assert(splitArgs([]) == ArgSplit([], []));
+    static assert(splitArgs(["a", "b"]) == ArgSplit(["a", "b"], []));
     static assert(splitArgs(["a", "--"]) == ArgSplit(["a"], []));
     static assert(splitArgs(["a", "--", "b"]) == ArgSplit(["a"], ["b"]));
     static assert(splitArgs(["a", "--", "b", "c"]) == ArgSplit(["a"], ["b", "c"]));
 }
-
 
 /**
  * Returns an option name without the leading ("--" or "-"). If it is not an
@@ -645,7 +644,6 @@ Options parseArgs(Options)(const(string)[] arguments) pure
         }
     }
 
-
     // Left over arguments
     auto leftOver = args.head
         .enumerate
@@ -745,7 +743,7 @@ unittest
 
     auto options = parseArgs!Options([
             "myprogram",
-            "blah1",
+            "arg1",
             "--help",
             "--test",
             "test test",
@@ -754,13 +752,13 @@ unittest
             "42",
             "--color=test",
             "--",
-            "blah2",
+            "arg2",
         ]);
 
     assert(options == Options(
             "test test",
             OptionFlag.yes,
-            ["blah1", "blah2"],
+            ["arg1", "arg2"],
             OptionFlag.yes,
             42,
             "test",
