@@ -5,6 +5,10 @@
  *
  * Description:
  * Parses arguments.
+ *
+ * TODO:
+ *  - Generate help strings
+ *  - Support sub-commands
  */
 module argparse;
 
@@ -401,8 +405,6 @@ private template isValidOptionType(T)
 {
     import std.traits : isBasicType, isSomeString;
 
-    // FIXME: Allow OptionHandler and ArgumentHandler to have attributes
-
     static if (isBasicType!T ||
                isSomeString!T ||
                is(T : OptionHandler) ||
@@ -546,6 +548,8 @@ Options parseArgs(Options)(const(string)[] arguments)
     import std.traits;
     import std.format : format;
     import std.container.array;
+    import std.range : chain, enumerate, empty, front, popFront;
+    import std.algorithm.iteration : map, filter;
 
     debug import std.stdio;
 
@@ -554,8 +558,6 @@ Options parseArgs(Options)(const(string)[] arguments)
     Options options;
 
     auto args = splitArgs(arguments[1 .. $]);
-
-    const(string)[] argsOnly;
 
     // Arguments that have been parsed
     bool[] parsed;
@@ -588,7 +590,6 @@ Options parseArgs(Options)(const(string)[] arguments)
 
                         static if (hasArgument!(typeof(symbol)))
                         {
-                            // FIXME: Handle '=' arguments
                             if (opt.tail)
                             {
                                 static if (is(typeof(symbol) : ArgumentHandler))
@@ -649,8 +650,15 @@ Options parseArgs(Options)(const(string)[] arguments)
         }
     }
 
+
+    // Left over arguments
+    auto leftOver = args.head
+        .enumerate
+        .filter!(a => !parsed[a[0]])
+        .map!(a => a[1])
+        .chain(args.tail);
+
     // Only positional arguments are left
-    size_t j = 0;
     foreach (member; __traits(allMembers, Options))
     {
         alias symbol = Identity!(__traits(getMember, options, member));
@@ -661,15 +669,11 @@ Options parseArgs(Options)(const(string)[] arguments)
             // Keep consuming arguments until the multiplicity is satisfied
             for (size_t i = 0; i < argUDAs[0].upperBound; ++i)
             {
-                // Find the next unparsed option.
-                while (j < parsed.length && parsed[j])
-                    ++j;
-
-                if (j == parsed.length)
+                // Out of arguments?
+                if (leftOver.empty)
                 {
-                    // Out of arguments.
                     if (i >= argUDAs[0].lowerBound)
-                        break; // But multiplicity is satisfied
+                        break; // Multiplicity is satisfied
 
                     throw new ArgParseException(
                         "Missing '"~ member ~"' argument"
@@ -680,24 +684,24 @@ Options parseArgs(Options)(const(string)[] arguments)
                 static if (argUDAs[0].upperBound <= 2)
                 {
                     static if (is(typeof(symbol) : ArgumentHandler))
-                        __traits(getMember, options, member)(args.head[j]);
+                        __traits(getMember, options, member)(leftOver.front);
                     else
                         __traits(getMember, options, member) =
-                            parseArg!(typeof(symbol))(args.head[j]);
+                            parseArg!(typeof(symbol))(leftOver.front);
                 }
                 else
                 {
                     static if (is(typeof(symbol) : ArgumentHandler))
-                        __traits(getMember, options, member)(args.head[j]);
+                        __traits(getMember, options, member)(leftOver.front);
                     else
                     {
                         import std.range.primitives : ElementType;
                         __traits(getMember, options, member) ~=
-                            parseArg!(ElementType!(typeof(symbol)))(args.head[j]);
+                            parseArg!(ElementType!(typeof(symbol)))(leftOver.front);
                     }
                 }
 
-                parsed[j] = true;
+                leftOver.popFront();
             }
         }
     }
@@ -753,6 +757,7 @@ unittest
             "--threads",
             "42",
             "--color=test",
+            "--",
             "blah2",
         ]);
 
