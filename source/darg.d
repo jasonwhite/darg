@@ -11,7 +11,7 @@
  *  - Support sub-commands
  *  - Handle enumeration types
  */
-module argparse;
+module darg;
 
 /**
  * Generic argument parsing exception.
