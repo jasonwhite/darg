@@ -89,6 +89,16 @@ enum OptionFlag
 }
 
 /**
+ * Multiplicity of an argument.
+ */
+enum Multiplicity
+{
+    optional, // ?
+    zeroOrMore, // *
+    oneOrMore, // +
+}
+
+/**
  * User defined attribute for a positional argument.
  */
 struct Argument
@@ -106,12 +116,17 @@ struct Argument
      * [lowerBound, upperBound)).
      */
     size_t lowerBound = 1;
-    size_t upperBound = 2; /// Ditto
+    size_t upperBound = 1; /// Ditto
 
-    /**
-     * An argument with exactly 1 value.
-     */
-    this(string name, size_t lowerBound = 1, size_t upperBound = 2) pure nothrow
+    this(string name, size_t lowerBound = 1) pure nothrow
+    body
+    {
+        this.name = name;
+        this.lowerBound = lowerBound;
+        this.upperBound = lowerBound;
+    }
+
+    this(string name, size_t lowerBound, size_t upperBound) pure nothrow
     in { assert(lowerBound < upperBound); }
     body
     {
@@ -122,35 +137,25 @@ struct Argument
 
     /**
      * An argument with a multiplicity specifier.
-     *
-     * Possible multiplicity specifiers:
-     *  '?' 0 or 1
-     *  '*' 0 or more
-     *  '+' 1 or more
      */
-    this(string name, char multiplicity) pure
+    this(string name, Multiplicity multiplicity) pure nothrow
     {
         this.name = name;
 
-        switch (multiplicity)
+        final switch (multiplicity)
         {
-            case '?':
+            case Multiplicity.optional:
                 this.lowerBound = 0;
                 this.upperBound = 1;
                 break;
-            case '*':
+            case Multiplicity.zeroOrMore:
                 this.lowerBound = 0;
                 this.upperBound = size_t.max;
                 break;
-            case '+':
+            case Multiplicity.oneOrMore:
                 this.lowerBound = 1;
                 this.upperBound = size_t.max;
                 break;
-            default:
-                throw new ArgParseException(
-                        "Invalid argument multiplicity specifier:"
-                        " must be either '?', '*', or '+'"
-                        );
         }
     }
 }
@@ -161,36 +166,26 @@ unittest
     {
         assert(name == "lion");
         assert(lowerBound == 1);
-        assert(upperBound == 2);
+        assert(upperBound == 1);
     }
 
-    with (Argument("tiger", '?'))
+    with (Argument("tiger", Multiplicity.optional))
     {
         assert(lowerBound == 0);
         assert(upperBound == 1);
     }
 
-    with (Argument("bear", '*'))
+    with (Argument("bear", Multiplicity.zeroOrMore))
     {
         assert(lowerBound == 0);
         assert(upperBound == size_t.max);
     }
 
-    with (Argument("dinosaur", '+'))
+    with (Argument("dinosaur", Multiplicity.oneOrMore))
     {
         assert(lowerBound == 1);
         assert(upperBound == size_t.max);
     }
-}
-
-unittest
-{
-    import std.exception : collectException;
-
-    assert( collectException!ArgParseException(Argument("failure", 'q')));
-    assert(!collectException!ArgParseException(Argument("success", '?')));
-    assert(!collectException!ArgParseException(Argument("success", '*')));
-    assert(!collectException!ArgParseException(Argument("success", '+')));
 }
 
 /**
@@ -542,7 +537,7 @@ unittest
  *
  * Throws: ArgParseException if arguments are invalid.
  */
-Options parseArgs(Options)(const(string)[] arguments)
+Options parseArgs(Options)(const(string)[] arguments) pure
     if (is(Options == struct))
 {
     import std.traits;
@@ -676,12 +671,12 @@ Options parseArgs(Options)(const(string)[] arguments)
                         break; // Multiplicity is satisfied
 
                     throw new ArgParseException(
-                        "Missing '"~ member ~"' argument"
+                        "Multiplicity unsatisfied for '"~ member ~"' argument"
                         );
                 }
 
                 // Set argument or add to list of arguments.
-                static if (argUDAs[0].upperBound <= 2)
+                static if (argUDAs[0].upperBound <= 1)
                 {
                     static if (is(typeof(symbol) : ArgumentHandler))
                         __traits(getMember, options, member)(leftOver.front);
@@ -706,7 +701,8 @@ Options parseArgs(Options)(const(string)[] arguments)
         }
     }
 
-    // FIXME: Any unhandled arguments here are erroneous.
+    if (!leftOver.empty)
+        throw new ArgParseException("Too many arguments specified");
 
     return options;
 }
@@ -728,7 +724,7 @@ unittest
         @Help("Prints help on command line arguments.")
         OptionFlag help;
 
-        @Argument("path", 2, 3)
+        @Argument("path", 2)
         @Help("Path to the build description.")
         string[] path;
 
