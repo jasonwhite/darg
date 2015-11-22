@@ -551,7 +551,7 @@ Options parseArgs(Options)(const(string)[] arguments) pure
 
     Options options;
 
-    auto args = splitArgs(arguments[1 .. $]);
+    auto args = splitArgs(arguments);
 
     // Arguments that have been parsed
     bool[] parsed;
@@ -742,7 +742,6 @@ unittest
     }
 
     auto options = parseArgs!Options([
-            "myprogram",
             "arg1",
             "--help",
             "--test",
