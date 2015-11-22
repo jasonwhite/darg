@@ -308,14 +308,14 @@ unittest
 
 private static struct ArgSplit
 {
-    string[] head;
-    string[] tail;
+    const(string)[] head;
+    const(string)[] tail;
 }
 
 /**
  * Splits arguments on "--".
  */
-private auto splitArgs(string[] args) pure
+private auto splitArgs(const(string)[] args) pure
 {
     size_t i = 0;
     while (i < args.length && args[i] != "--")
@@ -540,7 +540,7 @@ unittest
  *
  * Throws: ArgParseException if arguments are invalid.
  */
-Options parseArgs(Options)(string[] args)
+Options parseArgs(Options)(const(string)[] arguments)
     if (is(Options == struct))
 {
     import std.traits;
@@ -553,25 +553,13 @@ Options parseArgs(Options)(string[] args)
 
     Options options;
 
-    args = args[1 .. $];
-    string[] argsOnly;
+    auto args = splitArgs(arguments[1 .. $]);
 
-    {
-        // Split on "--".
-        size_t i = 0;
-        while (i < args.length && args[i] != "--")
-            ++i;
-
-        if (i < args.length)
-        {
-            args     = args[0 .. i];
-            argsOnly = args[i+1 .. $];
-        }
-    }
+    const(string)[] argsOnly;
 
     // Arguments that have been parsed
     bool[] parsed;
-    parsed.length = args.length;
+    parsed.length = args.head.length;
 
     // Parsing occurs in two passes:
     //
@@ -581,11 +569,11 @@ Options parseArgs(Options)(string[] args)
     // After the first pass, only positional arguments and invalid options will
     // be left.
 
-    for (size_t i = 0; i < args.length; ++i)
+    for (size_t i = 0; i < args.head.length; ++i)
     {
-        auto option = splitOption(args[i]);
+        auto opt = splitOption(args.head[i]);
 
-        if (immutable name = optionToName(option.head))
+        if (immutable name = optionToName(opt.head))
         {
             foreach (member; __traits(allMembers, Options))
             {
@@ -601,39 +589,39 @@ Options parseArgs(Options)(string[] args)
                         static if (hasArgument!(typeof(symbol)))
                         {
                             // FIXME: Handle '=' arguments
-                            if (option.tail)
+                            if (opt.tail)
                             {
                                 static if (is(typeof(symbol) : ArgumentHandler))
-                                    __traits(getMember, options, member)(option.tail);
+                                    __traits(getMember, options, member)(opt.tail);
                                 else
                                     __traits(getMember, options, member) =
-                                        parseArg!(typeof(symbol))(option.tail);
+                                        parseArg!(typeof(symbol))(opt.tail);
                             }
                             else
                             {
                                 ++i;
 
-                                if (i >= args.length || isOption(args[i]))
+                                if (i >= args.head.length || isOption(args.head[i]))
                                     throw new ArgParseException(
                                             "Expected argument for option '%s'"
-                                            .format(option.head)
+                                            .format(opt.head)
                                             );
 
                                 static if (is(typeof(symbol) : ArgumentHandler))
-                                    __traits(getMember, options, member)(args[i]);
+                                    __traits(getMember, options, member)(args.head[i]);
                                 else
                                     __traits(getMember, options, member) =
-                                        parseArg!(typeof(symbol))(args[i]);
+                                        parseArg!(typeof(symbol))(args.head[i]);
 
                                 parsed[i] = true;
                             }
                         }
                         else
                         {
-                            if (option.tail)
+                            if (opt.tail)
                                 throw new ArgParseException(
                                         "Option '%s' does not take an argument"
-                                        .format(option.head)
+                                        .format(opt.head)
                                         );
 
                             static if (is(typeof(symbol) : OptionHandler))
@@ -651,12 +639,12 @@ Options parseArgs(Options)(string[] args)
     }
 
     // Any left over options are erroneous
-    for (size_t i = 0; i < args.length; ++i)
+    for (size_t i = 0; i < args.head.length; ++i)
     {
-        if (!parsed[i] && isOption(args[i]))
+        if (!parsed[i] && isOption(args.head[i]))
         {
             throw new ArgParseException(
-                "Invalid option '"~ args[i] ~"'"
+                "Invalid option '"~ args.head[i] ~"'"
                 );
         }
     }
@@ -692,20 +680,20 @@ Options parseArgs(Options)(string[] args)
                 static if (argUDAs[0].upperBound <= 2)
                 {
                     static if (is(typeof(symbol) : ArgumentHandler))
-                        __traits(getMember, options, member)(args[j]);
+                        __traits(getMember, options, member)(args.head[j]);
                     else
                         __traits(getMember, options, member) =
-                            parseArg!(typeof(symbol))(args[j]);
+                            parseArg!(typeof(symbol))(args.head[j]);
                 }
                 else
                 {
                     static if (is(typeof(symbol) : ArgumentHandler))
-                        __traits(getMember, options, member)(args[j]);
+                        __traits(getMember, options, member)(args.head[j]);
                     else
                     {
                         import std.range.primitives : ElementType;
                         __traits(getMember, options, member) ~=
-                            parseArg!(ElementType!(typeof(symbol)))(args[j]);
+                            parseArg!(ElementType!(typeof(symbol)))(args.head[j]);
                     }
                 }
 
@@ -722,8 +710,6 @@ Options parseArgs(Options)(string[] args)
 /// Ditto
 unittest
 {
-    debug import std.stdio;
-
     static struct Options
     {
         string testValue;
@@ -769,8 +755,6 @@ unittest
             "--color=test",
             "blah2",
         ]);
-
-    debug writeln(options);
 
     assert(options == Options(
             "test test",
