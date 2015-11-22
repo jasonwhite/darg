@@ -111,7 +111,6 @@ struct Argument
     in { assert(lowerBound < upperBound); }
     body
     {
-        // TODO: Check if the name has spaces. (Replace with a dash?)
         this.name = name;
         this.lowerBound = lowerBound;
         this.upperBound = upperBound;
@@ -301,10 +300,42 @@ private auto splitOption(string option) pure
 
 unittest
 {
+    static assert(splitOption("") == OptionSplit("", null));
     static assert(splitOption("--foo") == OptionSplit("--foo", null));
     static assert(splitOption("--foo=") == OptionSplit("--foo", ""));
     static assert(splitOption("--foo=bar") == OptionSplit("--foo", "bar"));
 }
+
+private static struct ArgSplit
+{
+    string[] head;
+    string[] tail;
+}
+
+/**
+ * Splits arguments on "--".
+ */
+private auto splitArgs(string[] args) pure
+{
+    size_t i = 0;
+    while (i < args.length && args[i] != "--")
+        ++i;
+
+    return ArgSplit(
+            args[0 .. i],
+            (i < args.length) ? args[i+1 .. $] : null
+            );
+}
+
+unittest
+{
+    static assert(splitArgs([]) == ArgSplit([], null));
+    static assert(splitArgs(["a", "b"]) == ArgSplit(["a", "b"], null));
+    static assert(splitArgs(["a", "--"]) == ArgSplit(["a"], []));
+    static assert(splitArgs(["a", "--", "b"]) == ArgSplit(["a"], ["b"]));
+    static assert(splitArgs(["a", "--", "b", "c"]) == ArgSplit(["a"], ["b", "c"]));
+}
+
 
 /**
  * Returns an option name without the leading ("--" or "-"). If it is not an
