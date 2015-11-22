@@ -1,6 +1,7 @@
 # D Argument Parser
 
-Better command line argument parsing for D.
+Better command line argument parsing using D's powerful compile-time code
+generation facilities.
 
 ## Example
 
@@ -35,7 +36,7 @@ int main(string[] args)
         return 1;
     }
 
-    if (options.help)
+    if (options.help == OptionFlag.yes)
     {
         writeln(helpString!Options);
         return 0;
