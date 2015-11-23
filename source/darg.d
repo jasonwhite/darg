@@ -10,6 +10,7 @@
  *  - Generate help strings
  *  - Support sub-commands
  *  - Handle enumeration types
+ *  - Handle bundled options
  */
 module darg;
 
@@ -94,9 +95,9 @@ enum OptionFlag
  */
 enum Multiplicity
 {
-    optional, // ?
-    zeroOrMore, // *
-    oneOrMore, // +
+    optional,
+    zeroOrMore,
+    oneOrMore,
 }
 
 /**
@@ -159,6 +160,41 @@ struct Argument
                 break;
         }
     }
+
+    /**
+     * Convert to a usage string.
+     */
+    @property string usage() const pure
+    {
+        import std.format : format;
+
+        if (lowerBound == 0)
+        {
+            if (upperBound == 1)
+                return "["~ name ~"]";
+            else if (upperBound == upperBound.max)
+                return "["~ name ~"...]";
+
+            return "["~ name ~"... (up to %d times)]".format(upperBound);
+        }
+        else if (lowerBound == 1)
+        {
+            if (upperBound == 1)
+                return name;
+            else if (upperBound == upperBound.max)
+                return name ~ " ["~ name ~"...]";
+
+            return name ~ " ["~ name ~"... (up to %d times)]"
+                .format(upperBound-1);
+        }
+
+        if (lowerBound == upperBound)
+            return name ~" (multiplicity of %d)"
+                .format(upperBound);
+
+        return name ~" ["~ name ~"... (between %d and %d times)]"
+            .format(lowerBound-1, upperBound-1);
+    }
 }
 
 unittest
@@ -198,30 +234,18 @@ struct Help
 }
 
 /**
+ * Meta variable name.
+ */
+struct MetaVar
+{
+    string name;
+}
+
+/**
  * Function signatures that can handle arguments or options.
  */
 private alias void OptionHandler() pure;
 private alias void ArgumentHandler(string) pure; /// Ditto
-
-/**
- * Constructs a printable usage string at compile time from the given options
- * structure.
- */
-string usageString(Options)(string program) pure nothrow
-    if (is(Options == struct))
-{
-    return "TODO";
-}
-
-/**
- * Constructs a printable help string at compile time for the given options
- * structure.
- */
-string helpString(Options)() pure nothrow
-    if (is(Options == struct))
-{
-    return "TODO";
-}
 
 /**
  * Returns true if the given argument is a short option. That is, if it starts
@@ -529,6 +553,70 @@ unittest
 }
 
 /**
+ * Constructs a printable usage string at compile time from the given options
+ * structure.
+ */
+string usageString(Options)(string program) pure
+    if (is(Options == struct))
+{
+    import std.traits;
+    import std.array : replicate;
+    import std.string : wrap, toUpper;
+
+    string output = "usage: "~ program;
+
+    string indent = " ".replicate(output.length + 1);
+
+    // List all options
+    foreach (member; __traits(allMembers, Options))
+    {
+        alias symbol = Identity!(__traits(getMember, Options, member));
+        alias optUDAs = getUDAs!(symbol, Option);
+
+        static if (optUDAs.length > 0 && optUDAs[0].names.length > 0)
+        {
+            output ~= " ["~ nameToOption(optUDAs[0].names[0]);
+
+            // Print argument information, if applicable.
+            static if (hasArgument!(typeof(symbol)))
+            {
+                alias metavar = getUDAs!(symbol, MetaVar);
+                static if (metavar.length > 0)
+                    output ~= "="~ metavar[0].name;
+                else static if (is(typeof(symbol) : ArgumentHandler))
+                    output ~= "="~ member.toUpper;
+                else
+                    output ~= "=<"~ typeof(symbol).stringof ~ ">";
+            }
+
+            output ~= "]";
+        }
+    }
+
+    // List all arguments
+    foreach (member; __traits(allMembers, Options))
+    {
+        alias symbol = Identity!(__traits(getMember, Options, member));
+        alias argUDAs = getUDAs!(symbol, Argument);
+
+        static if (argUDAs.length > 0)
+            output ~= " "~ argUDAs[0].usage;
+    }
+
+    return output.wrap(80, null, indent, 4);
+}
+
+/**
+ * Constructs a printable help string at compile time for the given options
+ * structure.
+ */
+string helpString(Options)() pure nothrow
+    if (is(Options == struct))
+{
+    return "TODO";
+}
+
+/**
  * Parses options from the given list of arguments. Note that the first argument
  * is assumed to be the program name and is ignored.
  *
@@ -722,7 +810,11 @@ unittest
         @Help("Prints help on command line arguments.")
         OptionFlag help;
 
-        @Argument("path", 2)
+        @Option("version")
+        @Help("Prints version information.")
+        OptionFlag version_;
+
+        @Argument("path", Multiplicity.oneOrMore)
         @Help("Path to the build description.")
         string[] path;
 
@@ -738,12 +830,14 @@ unittest
 
         @Option("color")
         @Help("When to colorize the output.")
+        @MetaVar("{auto,always,never}")
         string color = "auto";
     }
 
     auto options = parseArgs!Options([
             "arg1",
             "--help",
+            "--version",
             "--test",
             "test test",
             "--dryrun",
@@ -757,9 +851,17 @@ unittest
     assert(options == Options(
             "test test",
             OptionFlag.yes,
+            OptionFlag.yes,
             ["arg1", "arg2"],
             OptionFlag.yes,
             42,
             "test",
             ));
+
+    debug
+    {
+        import std.stdio;
+        enum usage = usageString!Options("darg");
+        write(usage);
+    }
 }
