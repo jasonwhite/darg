@@ -466,6 +466,90 @@ unittest
 }
 
 /**
+ * Count the number of positional arguments.
+ */
+size_t countArgs(Options)() pure nothrow
+{
+    import std.traits;
+    import std.algorithm.comparison : min;
+
+    size_t count = 0;
+
+    foreach (member; __traits(allMembers, Options))
+    {
+        alias symbol = Identity!(__traits(getMember, Options, member));
+        alias argUDAs = getUDAs!(symbol, Argument);
+        count += min(argUDAs.length, 1);
+    }
+
+    return count;
+}
+
+/**
+ * Count the number of options.
+ */
+size_t countOpts(Options)() pure nothrow
+{
+    import std.traits;
+    import std.algorithm.comparison : min;
+
+    size_t count = 0;
+
+    foreach (member; __traits(allMembers, Options))
+    {
+        alias symbol = Identity!(__traits(getMember, Options, member));
+        alias optUDAs = getUDAs!(symbol, Option);
+        count += min(optUDAs.length, 1);
+    }
+
+    return count;
+}
+
+unittest
+{
+    static struct A {}
+
+    static assert(countArgs!A == 0);
+    static assert(countOpts!A == 0);
+
+    static struct B
+    {
+        @Argument("test1")
+        string test1;
+        @Argument("test2")
+        string test2;
+
+        @Option("test3", "test3a")
+        @Option("test3b", "test3c")
+        string test3;
+    }
+
+    static assert(countArgs!B == 2);
+    static assert(countOpts!B == 1);
+
+    static struct C
+    {
+        string test;
+
+        @Argument("test1")
+        string test1;
+
+        @Argument("test2")
+        @Argument("test2a")
+        string test2;
+
+        @Option("test3")
+        string test3;
+
+        @Option("test4")
+        string test4;
+    }
+
+    static assert(countArgs!C == 2);
+    static assert(countOpts!C == 2);
+}
+
+/**
  * Checks if the given options are valid.
  */
 private void validateOptions(Options)() pure nothrow
@@ -563,7 +647,7 @@ string usageString(Options)(string program) pure
     import std.array : replicate;
     import std.string : wrap, toUpper;
 
-    string output = "usage: "~ program;
+    string output = "Usage: "~ program;
 
     string indent = " ".replicate(output.length + 1);
 
@@ -610,10 +694,67 @@ string usageString(Options)(string program) pure
  * Constructs a printable help string at compile time for the given options
  * structure.
  */
-string helpString(Options)() pure nothrow
+string helpString(Options)(string description = null) pure
     if (is(Options == struct))
 {
-    return "TODO";
+    import std.traits;
+    import std.format : format;
+    import std.algorithm.comparison : min;
+    import std.array : replicate;
+    import std.string : wrap;
+
+    string output;
+
+    if (description)
+        output ~= description.wrap(80) ~ "\n";
+
+    // List all positional arguments.
+    static if(countArgs!Options > 0)
+    {
+        output ~= "Positional arguments:\n";
+
+        foreach (member; __traits(allMembers, Options))
+        {
+            alias symbol = Identity!(__traits(getMember, Options, member));
+            alias argUDAs = getUDAs!(symbol, Argument);
+
+            static if (argUDAs.length > 0)
+            {
+                immutable padding = 12;
+                enum name = argUDAs[0].name;
+                output ~= " "~ name;
+
+                if (name.length > padding)
+                    output ~= "\n";
+
+                alias helpUDAs = getUDAs!(symbol, Help);
+                static if (helpUDAs.length > 0)
+                {
+                    immutable indent = " ".replicate(padding + 3);
+                    immutable firstIndent = (name.length > padding) ? indent :
+                        " ".replicate(padding - name.length + 2);
+
+                    output ~= helpUDAs[0].help.wrap(80, firstIndent, indent, 4);
+                }
+            }
+        }
+    }
+
+    // List all options
+    static if (countOpts!Options > 0)
+    {
+        foreach (member; __traits(allMembers, Options))
+        {
+            alias symbol = Identity!(__traits(getMember, Options, member));
+            alias optUDAs = getUDAs!(symbol, Option);
+
+            static if (optUDAs.length > 0)
+            {
+            }
+        }
+    }
+
+    return output;
 }
 
 /**
@@ -862,6 +1003,14 @@ unittest
     {
         import std.stdio;
         enum usage = usageString!Options("darg");
-        write(usage);
+        enum help = helpString!Options("""
+                An example program to demonstrate how to
+                use command line arguments. This program description can span
+                several lines. But that is okay, because it is word wrapped
+                automatically.
+                """
+                );
+        writeln(usage);
+        write(help);
     }
 }
