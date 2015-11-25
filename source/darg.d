@@ -691,6 +691,75 @@ string usageString(Options)(string program) pure
 }
 
 /**
+ * Generates a help string for a single argument. Returns null if the given
+ * member is not an argument.
+ */
+private string argumentHelp(Options, string member)() pure
+{
+    import std.traits;
+    import std.array : replicate;
+    import std.string : wrap;
+
+    string output;
+
+    alias symbol = Identity!(__traits(getMember, Options, member));
+    alias argUDAs = getUDAs!(symbol, Argument);
+
+    static if (argUDAs.length > 0)
+    {
+        immutable padding = 12;
+        enum name = argUDAs[0].name;
+        output ~= " "~ name;
+
+        if (name.length > padding)
+            output ~= "\n";
+
+        alias helpUDAs = getUDAs!(symbol, Help);
+        static if (helpUDAs.length > 0)
+        {
+            immutable indent = " ".replicate(padding + 3);
+            immutable firstIndent = (name.length > padding) ? indent :
+                " ".replicate(padding - name.length + 2);
+
+            output ~= helpUDAs[0].help.wrap(80, firstIndent, indent, 4);
+        }
+    }
+
+    return output;
+}
+
+/**
+ * Generates a help string for a single option. Returns null if the given member
+ * is not an option.
+ */
+private string optionHelp(Options, string member)() pure
+{
+    import std.traits;
+    import std.array : replicate;
+    import std.string : wrap;
+
+    string output;
+
+    alias symbol = Identity!(__traits(getMember, Options, member));
+    alias optUDAs = getUDAs!(symbol, Option);
+
+    static if (optUDAs.length > 0)
+    {
+        enum names = optUDAs[0].names;
+        if (names.length > 0)
+        {
+            output ~= " " ~ nameToOption(names[0]);
+            foreach (name; names[1 .. $])
+                output ~= ", " ~ nameToOption(name);
+
+            output ~= "\n";
+        }
+    }
+
+    return output;
+}
+
+/**
  * Constructs a printable help string at compile time for the given options
  * structure.
  */
@@ -699,8 +768,6 @@ string helpString(Options)(string description = null) pure
 {
     import std.traits;
     import std.format : format;
-    import std.algorithm.comparison : min;
-    import std.array : replicate;
     import std.string : wrap;
 
     string output;
@@ -714,44 +781,19 @@ string helpString(Options)(string description = null) pure
         output ~= "Positional arguments:\n";
 
         foreach (member; __traits(allMembers, Options))
-        {
-            alias symbol = Identity!(__traits(getMember, Options, member));
-            alias argUDAs = getUDAs!(symbol, Argument);
+            output ~= argumentHelp!(Options, member);
 
-            static if (argUDAs.length > 0)
-            {
-                immutable padding = 12;
-                enum name = argUDAs[0].name;
-                output ~= " "~ name;
-
-                if (name.length > padding)
-                    output ~= "\n";
-
-                alias helpUDAs = getUDAs!(symbol, Help);
-                static if (helpUDAs.length > 0)
-                {
-                    immutable indent = " ".replicate(padding + 3);
-                    immutable firstIndent = (name.length > padding) ? indent :
-                        " ".replicate(padding - name.length + 2);
-
-                    output ~= helpUDAs[0].help.wrap(80, firstIndent, indent, 4);
-                }
-            }
-        }
+        static if (countOpts!Options > 0)
+            output ~= "\n";
     }
 
     // List all options
     static if (countOpts!Options > 0)
     {
-        foreach (member; __traits(allMembers, Options))
-        {
-            alias symbol = Identity!(__traits(getMember, Options, member));
-            alias optUDAs = getUDAs!(symbol, Option);
+        output ~= "Optional arguments:\n";
 
-            static if (optUDAs.length > 0)
-            {
-            }
-        }
+        foreach (member; __traits(allMembers, Options))
+            output ~= optionHelp!(Options, member);
     }
 
     return output;
