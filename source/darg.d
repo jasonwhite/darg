@@ -637,6 +637,66 @@ unittest
 }
 
 /**
+ * Returns the canonical name of the given member's argument. If there is no
+ * argument for the given member, null is returned.
+ */
+private string argumentName(Options, string member)() pure
+{
+    import std.traits;
+    import std.string : toUpper;
+
+    alias symbol = Identity!(__traits(getMember, Options, member));
+
+    static if (hasArgument!(typeof(symbol)))
+    {
+        alias metavar = getUDAs!(symbol, MetaVar);
+        static if (metavar.length > 0)
+            return metavar[0].name;
+        else static if (is(typeof(symbol) : ArgumentHandler))
+            return member.toUpper;
+        else
+            return "<"~ typeof(symbol).stringof ~ ">";
+    }
+    else
+    {
+        return null;
+    }
+}
+
+unittest
+{
+    static struct Options
+    {
+        @Option("test1")
+        OptionFlag test1;
+
+        @Option("test2")
+        string test2;
+
+        @Option("test3")
+        @MetaVar("asdf")
+        string test3;
+
+        @Option("test4")
+        void test4(string arg) pure
+        {
+        }
+
+        @Option("test5")
+        @MetaVar("metavar")
+        void test5(string arg) pure
+        {
+        }
+    }
+
+    static assert(argumentName!(Options, "test1") == null);
+    static assert(argumentName!(Options, "test2") == "<string>");
+    static assert(argumentName!(Options, "test3") == "asdf");
+    static assert(argumentName!(Options, "test4") == "TEST4");
+    static assert(argumentName!(Options, "test5") == "metavar");
+}
+
+/**
  * Constructs a printable usage string at compile time from the given options
  * structure.
  */
@@ -661,17 +721,8 @@ string usageString(Options)(string program) pure
         {
             output ~= " ["~ nameToOption(optUDAs[0].names[0]);
 
-            // Print argument information, if applicable.
-            static if (hasArgument!(typeof(symbol)))
-            {
-                alias metavar = getUDAs!(symbol, MetaVar);
-                static if (metavar.length > 0)
-                    output ~= "="~ metavar[0].name;
-                else static if (is(typeof(symbol) : ArgumentHandler))
-                    output ~= "="~ member.toUpper;
-                else
-                    output ~= "=<"~ typeof(symbol).stringof ~ ">";
-            }
+            if (immutable name = argumentName!(Options, member))
+                output ~= "="~ name;
 
             output ~= "]";
         }
@@ -752,8 +803,12 @@ private string optionHelp(Options, string member)(size_t padding = 12) pure
         static if (names.length > 0)
         {
             output ~= " " ~ nameToOption(names[0]);
+
             foreach (name; names[1 .. $])
                 output ~= ", " ~ nameToOption(name);
+
+            if (string arg = argumentName!(Options, member))
+                output ~= " " ~ arg;
 
             immutable len = output.length;
 
