@@ -694,7 +694,7 @@ string usageString(Options)(string program) pure
  * Generates a help string for a single argument. Returns null if the given
  * member is not an argument.
  */
-private string argumentHelp(Options, string member)() pure
+private string argumentHelp(Options, string member)(size_t padding = 12) pure
 {
     import std.traits;
     import std.array : replicate;
@@ -707,21 +707,24 @@ private string argumentHelp(Options, string member)() pure
 
     static if (argUDAs.length > 0)
     {
-        immutable padding = 12;
         enum name = argUDAs[0].name;
         output ~= " "~ name;
-
-        if (name.length > padding)
-            output ~= "\n";
 
         alias helpUDAs = getUDAs!(symbol, Help);
         static if (helpUDAs.length > 0)
         {
+            if (name.length > padding)
+                output ~= "\n";
+
             immutable indent = " ".replicate(padding + 3);
             immutable firstIndent = (name.length > padding) ? indent :
                 " ".replicate(padding - name.length + 2);
 
             output ~= helpUDAs[0].help.wrap(80, firstIndent, indent, 4);
+        }
+        else
+        {
+            output ~= "\n";
         }
     }
 
@@ -732,7 +735,7 @@ private string argumentHelp(Options, string member)() pure
  * Generates a help string for a single option. Returns null if the given member
  * is not an option.
  */
-private string optionHelp(Options, string member)() pure
+private string optionHelp(Options, string member)(size_t padding = 12) pure
 {
     import std.traits;
     import std.array : replicate;
@@ -746,13 +749,31 @@ private string optionHelp(Options, string member)() pure
     static if (optUDAs.length > 0)
     {
         enum names = optUDAs[0].names;
-        if (names.length > 0)
+        static if (names.length > 0)
         {
             output ~= " " ~ nameToOption(names[0]);
             foreach (name; names[1 .. $])
                 output ~= ", " ~ nameToOption(name);
 
-            output ~= "\n";
+            immutable len = output.length;
+
+            alias helpUDAs = getUDAs!(symbol, Help);
+            static if (helpUDAs.length > 0)
+            {
+                immutable overflow = len > padding+1;
+                if (overflow)
+                    output ~= "\n";
+
+                immutable indent = " ".replicate(padding+3);
+                immutable firstIndent = overflow
+                    ? indent : " ".replicate((padding + 1) - len + 2);
+
+                output ~= helpUDAs[0].help.wrap(80, firstIndent, indent, 4);
+            }
+            else
+            {
+                output ~= "\n";
+            }
         }
     }
 
