@@ -745,7 +745,7 @@ string usageString(Options)(string program) pure
  * Generates a help string for a single argument. Returns null if the given
  * member is not an argument.
  */
-private string argumentHelp(Options, string member)(size_t padding = 12) pure
+private string argumentHelp(Options, string member)(size_t padding = 14) pure
 {
     import std.traits;
     import std.array : replicate;
@@ -786,7 +786,7 @@ private string argumentHelp(Options, string member)(size_t padding = 12) pure
  * Generates a help string for a single option. Returns null if the given member
  * is not an option.
  */
-private string optionHelp(Options, string member)(size_t padding = 12) pure
+private string optionHelp(Options, string member)(size_t padding = 14) pure
 {
     import std.traits;
     import std.array : replicate;
