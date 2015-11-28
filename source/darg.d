@@ -112,9 +112,6 @@ struct Argument
 
     /**
      * Lower and upper bounds for the number of values this argument can have.
-     *
-     * Note that the boundary interval is closed left and open right (i.e.,
-     * [lowerBound, upperBound)).
      */
     size_t lowerBound = 1;
     size_t upperBound = 1; /// Ditto
