@@ -9,7 +9,6 @@
  * TODO:
  *  - Generate help strings
  *  - Support sub-commands
- *  - Handle enumeration types
  *  - Handle bundled options
  */
 module darg;
@@ -251,7 +250,7 @@ private alias void ArgumentHandler(string) pure; /// Ditto
  * Returns true if the given argument is a short option. That is, if it starts
  * with a '-'.
  */
-private bool isShortOption(string arg) pure nothrow
+bool isShortOption(string arg) pure nothrow
 {
     return arg.length > 1 && arg[0] == '-' && arg[1] != '-';
 }
@@ -272,7 +271,7 @@ unittest
  * Returns true if the given argument is a long option. That is, if it starts
  * with "--".
  */
-private bool isLongOption(string arg) pure nothrow
+bool isLongOption(string arg) pure nothrow
 {
     return arg.length > 2 && arg[0 .. 2] == "--" && arg[2] != '-';
 }
@@ -295,7 +294,7 @@ unittest
  * Returns true if the given argument is an option. That is, it is either a
  * short option or a long option.
  */
-private bool isOption(string arg) pure nothrow
+bool isOption(string arg) pure nothrow
 {
     return isShortOption(arg) || isLongOption(arg);
 }
