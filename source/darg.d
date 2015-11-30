@@ -872,6 +872,15 @@ string helpString(Options)(string description = null) pure
 }
 
 /**
+ * Parsing configuration.
+ */
+enum Config
+{
+    bundling = 1 << 0,
+    ignoreUnknown = 1 << 2,
+}
+
+/**
  * Parses options from the given list of arguments. Note that the first argument
  * is assumed to be the program name and is ignored.
  *
@@ -879,8 +888,11 @@ string helpString(Options)(string description = null) pure
  *
  * Throws: ArgParseException if arguments are invalid.
  */
-Options parseArgs(Options)(const(string)[] arguments) pure
-    if (is(Options == struct))
+T parseArgs(T)(
+        const(string)[] arguments,
+        Config config = Config.bundling
+        ) pure
+    if (is(T == struct))
 {
     import std.traits;
     import std.format : format;
@@ -890,9 +902,9 @@ Options parseArgs(Options)(const(string)[] arguments) pure
 
     debug import std.stdio;
 
-    validateOptions!Options;
+    validateOptions!T;
 
-    Options options;
+    T options;
 
     auto args = splitArgs(arguments);
 
@@ -914,7 +926,7 @@ Options parseArgs(Options)(const(string)[] arguments) pure
 
         if (immutable name = optionToName(opt.head))
         {
-            foreach (member; __traits(allMembers, Options))
+            foreach (member; __traits(allMembers, T))
             {
                 alias symbol = Identity!(__traits(getMember, options, member));
                 alias optUDAs = getUDAs!(symbol, Option);
@@ -976,14 +988,17 @@ Options parseArgs(Options)(const(string)[] arguments) pure
         }
     }
 
-    // Any left over options are erroneous
-    for (size_t i = 0; i < args.head.length; ++i)
+    if ((config & Config.ignoreUnknown) != Config.ignoreUnknown)
     {
-        if (!parsed[i] && isOption(args.head[i]))
+        // Any left over options are erroneous
+        for (size_t i = 0; i < args.head.length; ++i)
         {
-            throw new ArgParseException(
-                "Invalid option '"~ args.head[i] ~"'"
-                );
+            if (!parsed[i] && isOption(args.head[i]))
+            {
+                throw new ArgParseException(
+                    "Unknown option '"~ args.head[i] ~"'"
+                    );
+            }
         }
     }
 
@@ -995,7 +1010,7 @@ Options parseArgs(Options)(const(string)[] arguments) pure
         .chain(args.tail);
 
     // Only positional arguments are left
-    foreach (member; __traits(allMembers, Options))
+    foreach (member; __traits(allMembers, T))
     {
         alias symbol = Identity!(__traits(getMember, options, member));
         alias argUDAs = getUDAs!(symbol, Argument);
@@ -1042,7 +1057,8 @@ Options parseArgs(Options)(const(string)[] arguments) pure
         }
     }
 
-    if (!leftOver.empty)
+    if (!leftOver.empty && (config & Config.ignoreUnknown) ==
+            Config.ignoreUnknown)
         throw new ArgParseException("Too many arguments specified");
 
     return options;
