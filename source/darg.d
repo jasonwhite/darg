@@ -1057,8 +1057,7 @@ T parseArgs(T)(
         }
     }
 
-    if (!leftOver.empty && (config & Config.ignoreUnknown) ==
-            Config.ignoreUnknown)
+    if (!leftOver.empty)
         throw new ArgParseException("Too many arguments specified");
 
     return options;
@@ -1143,4 +1142,36 @@ unittest
         writeln(usage);
         write(help);
     }
+}
+
+unittest
+{
+    static struct Options
+    {
+        @Option("help")
+        @Help("Prints help on command line usage.")
+        OptionFlag help;
+
+        @Option("version")
+        @Help("Prints version information.")
+        OptionFlag version_;
+
+        @Argument("command")
+        @Help("Subcommand")
+        string command;
+
+        @Argument("args", Multiplicity.zeroOrMore)
+        @Help("Arguments for the command.")
+        string[] args;
+    }
+
+    immutable args = ["--version", "status", "--asdf", "blah blah"];
+    auto options = parseArgs!Options(args, Config.ignoreUnknown);
+
+    assert(options == Options(
+            OptionFlag.no,
+            OptionFlag.yes,
+            "status",
+            ["--asdf", "blah blah"]
+            ));
 }
