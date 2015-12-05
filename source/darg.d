@@ -7,8 +7,6 @@
  * Parses arguments.
  *
  * TODO:
- *  - Generate help strings
- *  - Support sub-commands
  *  - Handle bundled options
  */
 module darg;
