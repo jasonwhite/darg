@@ -16,6 +16,8 @@ module darg;
  */
 class ArgParseException : Exception
 {
+    /**
+     */
     this(string msg) pure nothrow
     {
         super(msg);
@@ -27,8 +29,14 @@ class ArgParseException : Exception
  */
 struct Option
 {
+    /// List of names the option can have.
     string[] names;
 
+    /**
+     * Constructs the option with a list of names. Note that any leading "-" or
+     * "--" should be omitted. This is added automatically depending on the
+     * length of the name.
+     */
     this(string[] names...) pure nothrow
     {
         this.names = names;
@@ -112,16 +120,27 @@ struct Argument
      * Lower and upper bounds for the number of values this argument can have.
      */
     size_t lowerBound = 1;
-    size_t upperBound = 1; /// Ditto
 
-    this(string name, size_t lowerBound = 1) pure nothrow
+    /// Ditto
+    size_t upperBound = 1;
+
+    /**
+     * Constructs an argument with the given name and count. The count specifies
+     * how many argument elements should be consumed from the command line. By
+     * default, this is 1.
+     */
+    this(string name, size_t count = 1) pure nothrow
     body
     {
         this.name = name;
-        this.lowerBound = lowerBound;
-        this.upperBound = lowerBound;
+        this.lowerBound = count;
+        this.upperBound = count;
     }
 
+    /**
+     * Constructs an argument with the given name and an upper and lower bound
+     * for how many argument elements should be consumed from the command line.
+     */
     this(string name, size_t lowerBound, size_t upperBound) pure nothrow
     in { assert(lowerBound < upperBound); }
     body
@@ -224,6 +243,7 @@ unittest
  */
 struct Help
 {
+    /// Help string.
     string help;
 }
 
@@ -232,6 +252,7 @@ struct Help
  */
 struct MetaVar
 {
+    /// Name of the meta variable.
     string name;
 }
 
@@ -455,7 +476,7 @@ unittest
  */
 size_t countArgs(Options)() pure nothrow
 {
-    import std.traits;
+    import std.traits : Identity, getUDAs;
     import std.algorithm.comparison : min;
 
     size_t count = 0;
@@ -475,7 +496,7 @@ size_t countArgs(Options)() pure nothrow
  */
 size_t countOpts(Options)() pure nothrow
 {
-    import std.traits;
+    import std.traits : Identity, getUDAs;
     import std.algorithm.comparison : min;
 
     size_t count = 0;
@@ -627,7 +648,7 @@ unittest
  */
 private string argumentName(Options, string member)() pure
 {
-    import std.traits;
+    import std.traits : Identity, getUDAs;
     import std.string : toUpper;
 
     alias symbol = Identity!(__traits(getMember, Options, member));
@@ -662,15 +683,19 @@ unittest
         @MetaVar("asdf")
         string test3;
 
+        private string _arg;
+
         @Option("test4")
         void test4(string arg) pure
         {
+            _arg = arg;
         }
 
         @Option("test5")
         @MetaVar("metavar")
         void test5(string arg) pure
         {
+            _arg = arg;
         }
     }
 
@@ -688,7 +713,7 @@ unittest
 string usageString(Options)(string program) pure
     if (is(Options == struct))
 {
-    import std.traits;
+    import std.traits : Identity, getUDAs;
     import std.array : replicate;
     import std.string : wrap, toUpper;
 
@@ -732,7 +757,7 @@ string usageString(Options)(string program) pure
  */
 private string argumentHelp(Options, string member)(size_t padding = 14) pure
 {
-    import std.traits;
+    import std.traits : Identity, getUDAs;
     import std.array : replicate;
     import std.string : wrap;
 
@@ -773,7 +798,7 @@ private string argumentHelp(Options, string member)(size_t padding = 14) pure
  */
 private string optionHelp(Options, string member)(size_t padding = 14) pure
 {
-    import std.traits;
+    import std.traits : Identity, getUDAs;
     import std.array : replicate;
     import std.string : wrap;
 
@@ -827,7 +852,6 @@ private string optionHelp(Options, string member)(size_t padding = 14) pure
 string helpString(Options)(string description = null) pure
     if (is(Options == struct))
 {
-    import std.traits;
     import std.format : format;
     import std.string : wrap;
 
@@ -878,18 +902,15 @@ enum Config
  * Throws: ArgParseException if arguments are invalid.
  */
 T parseArgs(T)(
-        const(string)[] arguments,
+        const(string[]) arguments,
         Config config = Config.bundling
         ) pure
     if (is(T == struct))
 {
-    import std.traits;
+    import std.traits : Identity, getUDAs;
     import std.format : format;
-    import std.container.array;
     import std.range : chain, enumerate, empty, front, popFront;
     import std.algorithm.iteration : map, filter;
-
-    debug import std.stdio;
 
     validateOptions!T;
 
@@ -1078,12 +1099,12 @@ unittest
         string[] path;
 
         @Option("dryrun", "n")
-        @Help("Don't make any functional changes. Just print what might"
+        @Help("Don't make any functional changes. Just print what might" ~
               " happen.")
         OptionFlag dryRun;
 
         @Option("threads", "j")
-        @Help("The number of threads to use. Default is the number of"
+        @Help("The number of threads to use. Default is the number of" ~
               " logical cores.")
         size_t threads;
 
@@ -1093,7 +1114,7 @@ unittest
         string color = "auto";
     }
 
-    auto options = parseArgs!Options([
+    immutable options = parseArgs!Options([
             "arg1",
             "--help",
             "--version",
@@ -1116,21 +1137,6 @@ unittest
             42,
             "test",
             ));
-
-    debug
-    {
-        import std.stdio;
-        enum usage = usageString!Options("darg");
-        enum help = helpString!Options("""
-                An example program to demonstrate how to
-                use command line arguments. This program description can span
-                several lines. But that is okay, because it is word wrapped
-                automatically.
-                """
-                );
-        writeln(usage);
-        write(help);
-    }
 }
 
 unittest
@@ -1145,17 +1151,21 @@ unittest
         @Help("Prints version information.")
         OptionFlag version_;
 
-        @Argument("command")
+        @Argument("command", Multiplicity.optional)
         @Help("Subcommand")
         string command;
 
         @Argument("args", Multiplicity.zeroOrMore)
         @Help("Arguments for the command.")
-        string[] args;
+        const(string)[] args;
     }
 
-    immutable args = ["--version", "status", "--asdf", "blah blah"];
-    auto options = parseArgs!Options(args, Config.ignoreUnknown);
+    immutable options = parseArgs!Options([
+            "--version",
+            "status",
+            "--asdf",
+            "blah blah"
+        ], Config.ignoreUnknown);
 
     assert(options == Options(
             OptionFlag.no,
