@@ -422,6 +422,14 @@ unittest
     static assert(nameToOption("") is null);
 }
 
+unittest
+{
+    immutable identities = ["opt", "o", ""];
+
+    foreach (identity; identities)
+        assert(identity.nameToOption.optionToName == identity);
+}
+
 /**
  * Check if the given type is valid for an option.
  */
