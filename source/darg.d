@@ -402,15 +402,6 @@ unittest
 }
 
 /**
- * Checks if the given type is an option handler.
- */
-private enum isOptionHandler(T) =
-    is(typeof({
-        T handler;
-        handler();
-    }));
-
-/**
  * Check if the given type is valid for an option.
  */
 private template isValidOptionType(T)
