@@ -1,6 +1,7 @@
-[![Build Status](https://travis-ci.org/jasonwhite/darg.svg?branch=master)](https://travis-ci.org/jasonwhite/darg)
+[buildbadge]: https://travis-ci.org/jasonwhite/darg.svg?branch=master
+[buildstatus]: https://travis-ci.org/jasonwhite/darg
 
-# D Argument Parser
+# D Argument Parser [![Build Status][buildbadge]][buildstatus]
 
 Better command line argument parsing using D's powerful compile-time code
 generation facilities.
