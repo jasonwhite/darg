@@ -28,7 +28,7 @@ struct Options
 }
 
 // Generate the usage and help string at compile time.
-immutable usage = usageString!Options("program");
+immutable usage = usageString!Options("example");
 immutable help = helpString!Options;
 
 int main(string[] args)
@@ -47,8 +47,8 @@ int main(string[] args)
 
     if (options.help == OptionFlag.yes)
     {
-        writeln(usage);
-        writeln(help);
+        writeln(e.msg);
+        write(usage);
         return 0;
     }
 
@@ -61,10 +61,8 @@ int main(string[] args)
 }
 ```
 
-Running this example with `--help`, we get the following output:
-
     $ ./example --help
-    Usage: program [--help] [--threads=<ulong>] [file...]
+    Usage: example [--help] [--threads=<ulong>] [file...]
 
     Positional arguments:
      file            Input files
@@ -74,6 +72,10 @@ Running this example with `--help`, we get the following output:
      --threads, -t <ulong>
                      Number of threads to use.
     
+    $ ./example --foobar
+    Unknown option '--foobar'
+    Usage: program [--help] [--threads=<ulong>] [file...]
+
 
 ## License
 
