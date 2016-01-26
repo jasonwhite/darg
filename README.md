@@ -15,15 +15,21 @@ import darg;
 struct Options
 {
     @Option("help", "h")
+    @Help("Prints this help.")
     OptionFlag help;
 
     @Option("threads", "t")
+    @Help("Number of threads to use.")
     size_t threads;
 
     @Argument("file", Multiplicity.zeroOrMore)
     @Help("Input files")
     string[] files;
 }
+
+// Generate the usage and help string at compile time.
+immutable usage = usageString!Options("program");
+immutable help = helpString!Options;
 
 int main(string[] args)
 {
@@ -35,13 +41,14 @@ int main(string[] args)
     }
     catch (ArgParseException e)
     {
-        writeln(usageString!Options);
+        writeln(usage);
         return 1;
     }
 
     if (options.help == OptionFlag.yes)
     {
-        writeln(helpString!Options);
+        writeln(usage);
+        writeln(help);
         return 0;
     }
 
@@ -49,8 +56,24 @@ int main(string[] args)
     {
         // Use files
     }
+
+    return 0;
 }
 ```
+
+Running this example with `--help`, we get the following output:
+
+    $ ./example --help
+    Usage: program [--help] [--threads=<ulong>] [file...]
+
+    Positional arguments:
+     file            Input files
+
+    Optional arguments:
+     --help, -h      Prints this help.
+     --threads, -t <ulong>
+                     Number of threads to use.
+    
 
 ## License
 
