@@ -25,6 +25,17 @@ class ArgParseError : Exception
 }
 
 /**
+ * Thrown when help is requested.
+ */
+class ArgParseHelp : Exception
+{
+    this(string msg) pure nothrow
+    {
+        super(msg);
+    }
+}
+
+/**
  * User defined attribute for an option.
  */
 struct Option
@@ -929,8 +940,27 @@ string helpString(Options)(string description = null) pure
  */
 enum Config
 {
+    /**
+     * Enables option bundling. That is, multiple single character options can
+     * be bundled together.
+     */
     bundling = 1 << 0,
-    ignoreUnknown = 1 << 2,
+
+    /**
+     * Ignore unknown options. These are then parsed as positional arguments.
+     */
+    ignoreUnknown = 1 << 1,
+
+    /**
+     * Throw the ArgParseHelp exception when the option "help" is specified.
+     * This requires the option to exist in the options struct.
+     */
+    handleHelp = 1 << 2,
+
+    /**
+     * Default configuration options.
+     */
+    default_ = bundling | handleHelp,
 }
 
 /**
@@ -943,7 +973,7 @@ enum Config
  */
 T parseArgs(T)(
         const(string[]) arguments,
-        Config config = Config.bundling
+        Config config = Config.default_
         ) pure
     if (is(T == struct))
 {
@@ -1023,6 +1053,11 @@ T parseArgs(T)(
                                         "Option '%s' does not take an argument"
                                         .format(opt.head)
                                         );
+
+                            // Handle a request for help
+                            if ((config & Config.handleHelp) ==
+                                    Config.handleHelp && optUDAs[0] == "help")
+                                throw new ArgParseHelp("");
 
                             static if (is(typeof(symbol) : OptionHandler))
                                 __traits(getMember, options, member)();
