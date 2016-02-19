@@ -39,16 +39,17 @@ int main(string[] args)
     {
         options = parseArgs!Options(args[1 .. $]);
     }
-    catch (ArgParseException e)
+    catch (ArgParseError e)
     {
+        writeln(e.msg);
         writeln(usage);
         return 1;
     }
 
     if (options.help == OptionFlag.yes)
     {
-        writeln(e.msg);
-        write(usage);
+        writeln(usage);
+        write(help);
         return 0;
     }
 

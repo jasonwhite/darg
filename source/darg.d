@@ -14,7 +14,7 @@ module darg;
 /**
  * Generic argument parsing exception.
  */
-class ArgParseException : Exception
+class ArgParseError : Exception
 {
     /**
      */
@@ -207,6 +207,38 @@ struct Argument
 
         return name ~" ["~ name ~"... (between %d and %d times)]"
             .format(lowerBound-1, upperBound-1);
+    }
+
+    /**
+     * Get a multiplicity error string.
+     *
+     * Params:
+     *   specified = The number of parameters that were specified.
+     *
+     * Returns:
+     * If there is an error, returns a string explaining the error. Otherwise,
+     * returns $(D null).
+     */
+    @property string multiplicityError(size_t specified) const pure
+    {
+        import std.format : format;
+
+        if (specified >= lowerBound && specified <= upperBound)
+            return null;
+
+        if (specified < lowerBound)
+        {
+            if (lowerBound == 1 && upperBound == 1)
+                return "Expected a value for positional argument '%s'"
+                    .format(name);
+            else
+                return "Expected at least %d values for positional argument" ~
+                    " '%s'. Only %d values were specified."
+                    .format(lowerBound, name, specified);
+        }
+
+        // This should never happen. Argument parsing is not greedy.
+        return "Too many values specified for positional argument '%s'.";
     }
 }
 
@@ -624,7 +656,7 @@ unittest
 /**
  * Parses an argument.
  *
- * Throws: ArgParseException if the given argument cannot be converted to the
+ * Throws: ArgParseError if the given argument cannot be converted to the
  * requested type.
  */
 T parseArg(T)(string arg) pure
@@ -637,7 +669,7 @@ T parseArg(T)(string arg) pure
     }
     catch (ConvException e)
     {
-        throw new ArgParseException(e.msg);
+        throw new ArgParseError(e.msg);
     }
 }
 
@@ -647,7 +679,7 @@ unittest
 
     assert(parseArg!int("42") == 42);
     assert(parseArg!string("42") == "42");
-    assert(ce!ArgParseException(parseArg!size_t("-42")));
+    assert(ce!ArgParseError(parseArg!size_t("-42")));
 }
 
 /**
@@ -907,7 +939,7 @@ enum Config
  *
  * Returns: Options structure filled out with values.
  *
- * Throws: ArgParseException if arguments are invalid.
+ * Throws: ArgParseError if arguments are invalid.
  */
 T parseArgs(T)(
         const(string[]) arguments,
@@ -970,7 +1002,7 @@ T parseArgs(T)(
                                 ++i;
 
                                 if (i >= args.head.length || isOption(args.head[i]))
-                                    throw new ArgParseException(
+                                    throw new ArgParseError(
                                             "Expected argument for option '%s'"
                                             .format(opt.head)
                                             );
@@ -987,7 +1019,7 @@ T parseArgs(T)(
                         else
                         {
                             if (opt.tail)
-                                throw new ArgParseException(
+                                throw new ArgParseError(
                                         "Option '%s' does not take an argument"
                                         .format(opt.head)
                                         );
@@ -1013,7 +1045,7 @@ T parseArgs(T)(
         {
             if (!parsed[i] && isOption(args.head[i]))
             {
-                throw new ArgParseException(
+                throw new ArgParseError(
                     "Unknown option '"~ args.head[i] ~"'"
                     );
             }
@@ -1044,9 +1076,7 @@ T parseArgs(T)(
                     if (i >= argUDAs[0].lowerBound)
                         break; // Multiplicity is satisfied
 
-                    throw new ArgParseException(
-                        "Multiplicity unsatisfied for '"~ member ~"' argument"
-                        );
+                    throw new ArgParseError(argUDAs[0].multiplicityError(i));
                 }
 
                 // Set argument or add to list of arguments.
@@ -1076,12 +1106,12 @@ T parseArgs(T)(
     }
 
     if (!leftOver.empty)
-        throw new ArgParseException("Too many arguments specified");
+        throw new ArgParseError("Too many arguments specified");
 
     return options;
 }
 
-/// Ditto
+///
 unittest
 {
     static struct Options
@@ -1147,6 +1177,7 @@ unittest
             ));
 }
 
+///
 unittest
 {
     static struct Options
