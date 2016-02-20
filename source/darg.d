@@ -1189,7 +1189,6 @@ unittest
 
     immutable options = parseArgs!Options([
             "arg1",
-            "--help",
             "--version",
             "--test",
             "test test",
@@ -1203,7 +1202,7 @@ unittest
 
     assert(options == Options(
             "test test",
-            OptionFlag.yes,
+            OptionFlag.no,
             OptionFlag.yes,
             ["arg1", "arg2"],
             OptionFlag.yes,
