@@ -45,9 +45,9 @@ int main(string[] args)
         writeln(usage);
         return 1;
     }
-
-    if (options.help == OptionFlag.yes)
+    catch (ArgParseHelp e)
     {
+        // Help was requested
         writeln(usage);
         write(help);
         return 0;
