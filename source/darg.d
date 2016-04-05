@@ -97,13 +97,15 @@ struct Option
 
 /**
  * An option flag. These types of options are handled specially and never have
- * an argument. They can also be inverted with the "--no" prefix (e.g.,
- * "--nofoo").
+ * an argument.
  */
-enum OptionFlag
+enum OptionFlag : bool
 {
-    no,
-    yes,
+    /// The option flag was not specified.
+    no = false,
+
+    /// The option flag was specified.
+    yes = true,
 }
 
 /**
