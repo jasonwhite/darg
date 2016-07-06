@@ -7,4 +7,3 @@ os:
 d:
  - dmd
  - ldc
- - gdc
