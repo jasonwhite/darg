@@ -245,8 +245,8 @@ struct Argument
                 return "Expected a value for positional argument '%s'"
                     .format(name);
             else
-                return "Expected at least %d values for positional argument" ~
-                    " '%s'. Only %d values were specified."
+                return ("Expected at least %d values for positional argument" ~
+                    " '%s'. Only %d values were specified.")
                     .format(lowerBound, name, specified);
         }
 
