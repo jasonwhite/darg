@@ -529,14 +529,15 @@ unittest
  */
 size_t countArgs(Options)() pure nothrow
 {
-    import std.traits : Identity, getUDAs;
+    import std.meta : Alias;
+    import std.traits : getUDAs;
     import std.algorithm.comparison : min;
 
     size_t count = 0;
 
     foreach (member; __traits(allMembers, Options))
     {
-        alias symbol = Identity!(__traits(getMember, Options, member));
+        alias symbol = Alias!(__traits(getMember, Options, member));
         alias argUDAs = getUDAs!(symbol, Argument);
         count += min(argUDAs.length, 1);
     }
@@ -549,14 +550,15 @@ size_t countArgs(Options)() pure nothrow
  */
 size_t countOpts(Options)() pure nothrow
 {
-    import std.traits : Identity, getUDAs;
+    import std.meta : Alias;
+    import std.traits : getUDAs;
     import std.algorithm.comparison : min;
 
     size_t count = 0;
 
     foreach (member; __traits(allMembers, Options))
     {
-        alias symbol = Identity!(__traits(getMember, Options, member));
+        alias symbol = Alias!(__traits(getMember, Options, member));
         alias optUDAs = getUDAs!(symbol, Option);
         count += min(optUDAs.length, 1);
     }
@@ -613,11 +615,12 @@ unittest
  */
 private void validateOptions(Options)() pure nothrow
 {
-    import std.traits : Identity, getUDAs, fullyQualifiedName;
+    import std.meta : Alias;
+    import std.traits : getUDAs, fullyQualifiedName;
 
     foreach (member; __traits(allMembers, Options))
     {
-        alias symbol = Identity!(__traits(getMember, Options, member));
+        alias symbol = Alias!(__traits(getMember, Options, member));
         alias optUDAs = getUDAs!(symbol, Option);
         alias argUDAs = getUDAs!(symbol, Argument);
 
@@ -701,10 +704,11 @@ unittest
  */
 private string argumentName(Options, string member)() pure
 {
-    import std.traits : Identity, getUDAs;
+    import std.meta : Alias;
+    import std.traits : getUDAs;
     import std.string : toUpper;
 
-    alias symbol = Identity!(__traits(getMember, Options, member));
+    alias symbol = Alias!(__traits(getMember, Options, member));
 
     static if (hasArgument!(typeof(symbol)))
     {
@@ -766,7 +770,8 @@ unittest
 string usageString(Options)(string program) pure
     if (is(Options == struct))
 {
-    import std.traits : Identity, getUDAs;
+    import std.meta : Alias;
+    import std.traits : getUDAs;
     import std.array : replicate;
     import std.string : wrap, toUpper;
 
@@ -777,7 +782,7 @@ string usageString(Options)(string program) pure
     // List all options
     foreach (member; __traits(allMembers, Options))
     {
-        alias symbol = Identity!(__traits(getMember, Options, member));
+        alias symbol = Alias!(__traits(getMember, Options, member));
         alias optUDAs = getUDAs!(symbol, Option);
 
         static if (optUDAs.length > 0 && optUDAs[0].names.length > 0)
@@ -794,7 +799,7 @@ string usageString(Options)(string program) pure
     // List all arguments
     foreach (member; __traits(allMembers, Options))
     {
-        alias symbol = Identity!(__traits(getMember, Options, member));
+        alias symbol = Alias!(__traits(getMember, Options, member));
         alias argUDAs = getUDAs!(symbol, Argument);
 
         static if (argUDAs.length > 0)
@@ -810,13 +815,14 @@ string usageString(Options)(string program) pure
  */
 private string argumentHelp(Options, string member)(size_t padding = 14) pure
 {
-    import std.traits : Identity, getUDAs;
+    import std.meta : Alias;
+    import std.traits : getUDAs;
     import std.array : replicate;
     import std.string : wrap;
 
     string output;
 
-    alias symbol = Identity!(__traits(getMember, Options, member));
+    alias symbol = Alias!(__traits(getMember, Options, member));
     alias argUDAs = getUDAs!(symbol, Argument);
 
     static if (argUDAs.length > 0)
@@ -851,13 +857,14 @@ private string argumentHelp(Options, string member)(size_t padding = 14) pure
  */
 private string optionHelp(Options, string member)(size_t padding = 14) pure
 {
-    import std.traits : Identity, getUDAs;
+    import std.meta : Alias;
+    import std.traits : getUDAs;
     import std.array : replicate;
     import std.string : wrap;
 
     string output;
 
-    alias symbol = Identity!(__traits(getMember, Options, member));
+    alias symbol = Alias!(__traits(getMember, Options, member));
     alias optUDAs = getUDAs!(symbol, Option);
 
     static if (optUDAs.length > 0)
@@ -979,7 +986,8 @@ T parseArgs(T)(
         ) pure
     if (is(T == struct))
 {
-    import std.traits : Identity, getUDAs;
+    import std.meta : Alias;
+    import std.traits : getUDAs;
     import std.format : format;
     import std.range : chain, enumerate, empty, front, popFront;
     import std.algorithm.iteration : map, filter;
@@ -1010,7 +1018,7 @@ T parseArgs(T)(
         {
             foreach (member; __traits(allMembers, T))
             {
-                alias symbol = Identity!(__traits(getMember, options, member));
+                alias symbol = Alias!(__traits(getMember, options, member));
                 alias optUDAs = getUDAs!(symbol, Option);
 
                 static if (optUDAs.length > 0)
@@ -1099,7 +1107,7 @@ T parseArgs(T)(
     // Only positional arguments are left
     foreach (member; __traits(allMembers, T))
     {
-        alias symbol = Identity!(__traits(getMember, options, member));
+        alias symbol = Alias!(__traits(getMember, options, member));
         alias argUDAs = getUDAs!(symbol, Argument);
 
         static if (argUDAs.length > 0)
