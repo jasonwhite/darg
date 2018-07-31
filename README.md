@@ -6,6 +6,9 @@
 Better command line argument parsing using D's powerful compile-time code
 generation facilities.
 
+**Note**: This is a stable library, but it is no longer maintained. If you'd
+like to help out with maintanence please make an issue letting me know!
+
 ## Example
 
 ```d
