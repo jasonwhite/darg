@@ -307,6 +307,74 @@ struct MetaVar
 private alias void OptionHandler() pure;
 private alias void ArgumentHandler(string) pure; /// Ditto
 
+template isOptionHandler(Func)
+{
+    import std.meta : AliasSeq;
+    import std.traits : arity, hasFunctionAttributes, isFunction, ReturnType;
+
+    static if (isFunction!Func)
+    {
+        enum isOptionHandler =
+            hasFunctionAttributes!(Func, "pure") &&
+            is(ReturnType!Func == void) &&
+            arity!Func == 0;
+    }
+    else
+    {
+        enum isOptionHandler = false;
+    }
+}
+
+template isArgumentHandler(Func)
+{
+    import std.meta : AliasSeq;
+    import std.traits : hasFunctionAttributes, isFunction, Parameters, ReturnType;
+
+    static if (isFunction!Func)
+    {
+        enum isArgumentHandler =
+            hasFunctionAttributes!(Func, "pure") &&
+            is(ReturnType!Func == void) &&
+            is(Parameters!Func == AliasSeq!(string));
+    }
+    else
+    {
+        enum isArgumentHandler = false;
+    }
+}
+
+unittest
+{
+    struct TemplateOptions(T)
+    {
+        void optionHandler() pure { }
+        void argumentHandler(string) pure { }
+        string foo() pure { return ""; }
+        void bar() { import std.stdio : writeln; writeln("bar"); }
+        void baz(int) pure { }
+    }
+
+    TemplateOptions!int options;
+
+    static assert(!is(typeof(options.optionHandler) : OptionHandler));
+    static assert(!is(typeof(options.argumentHandler) : ArgumentHandler));
+    static assert(!is(typeof(options.foo) : ArgumentHandler));
+    static assert(!is(typeof(options.bar) : ArgumentHandler));
+    static assert(!is(typeof(options.baz) : ArgumentHandler));
+
+    static assert(isOptionHandler!(typeof(options.optionHandler)));
+    static assert(!isOptionHandler!(typeof(options.argumentHandler)));
+    static assert(!isOptionHandler!(typeof(options.foo)));
+    static assert(!isOptionHandler!(typeof(options.bar)));
+    static assert(!isOptionHandler!(typeof(options.baz)));
+
+    static assert(!isArgumentHandler!(typeof(options.optionHandler)));
+    static assert(isArgumentHandler!(typeof(options.argumentHandler)));
+    static assert(!isArgumentHandler!(typeof(options.foo)));
+    static assert(!isArgumentHandler!(typeof(options.bar)));
+    static assert(!isArgumentHandler!(typeof(options.baz)));
+}
+
 /**
  * Returns true if the given argument is a short option. That is, if it starts
  * with a '-'.
@@ -484,8 +552,8 @@ private template isValidOptionType(T)
 
     static if (isBasicType!T ||
                isSomeString!T ||
-               is(T : OptionHandler) ||
-               is(T : ArgumentHandler)
+               isOptionHandler!T ||
+               isArgumentHandler!T
         )
     {
         enum isValidOptionType = true;
@@ -653,7 +721,7 @@ private void validateOptions(Options)() pure nothrow
  */
 private template hasArgument(T)
 {
-    static if (is(T : OptionFlag) || is(T : OptionHandler))
+    static if (is(T : OptionFlag) || isOptionHandler!T)
         enum hasArgument = false;
     else
         enum hasArgument = true;
@@ -715,7 +783,7 @@ private string argumentName(Options, string member)() pure
         alias metavar = getUDAs!(symbol, MetaVar);
         static if (metavar.length > 0)
             return metavar[0].name;
-        else static if (is(typeof(symbol) : ArgumentHandler))
+        else static if (isArgumentHandler!(typeof(symbol)))
             return member.toUpper;
         else
             return "<"~ typeof(symbol).stringof ~ ">";
@@ -1031,7 +1099,7 @@ T parseArgs(T)(
                         {
                             if (opt.tail)
                             {
-                                static if (is(typeof(symbol) : ArgumentHandler))
+                                static if (isArgumentHandler!(typeof(symbol)))
                                     __traits(getMember, options, member)(opt.tail);
                                 else
                                     __traits(getMember, options, member) =
@@ -1047,7 +1115,7 @@ T parseArgs(T)(
                                             .format(opt.head)
                                             );
 
-                                static if (is(typeof(symbol) : ArgumentHandler))
+                                static if (isArgumentHandler!(typeof(symbol)))
                                     __traits(getMember, options, member)(args.head[i]);
                                 else
                                     __traits(getMember, options, member) =
@@ -1069,7 +1137,7 @@ T parseArgs(T)(
                                     Config.handleHelp && optUDAs[0] == "help")
                                 throw new ArgParseHelp("");
 
-                            static if (is(typeof(symbol) : OptionHandler))
+                            static if (isOptionHandler!(typeof(symbol)))
                                 __traits(getMember, options, member)();
                             else static if (is(typeof(symbol) : OptionFlag))
                                 __traits(getMember, options, member) =
@@ -1127,7 +1195,7 @@ T parseArgs(T)(
                 // Set argument or add to list of arguments.
                 static if (argUDAs[0].upperBound <= 1)
                 {
-                    static if (is(typeof(symbol) : ArgumentHandler))
+                    static if (isArgumentHandler!(typeof(symbol)))
                         __traits(getMember, options, member)(leftOver.front);
                     else
                         __traits(getMember, options, member) =
@@ -1135,7 +1203,7 @@ T parseArgs(T)(
                 }
                 else
                 {
-                    static if (is(typeof(symbol) : ArgumentHandler))
+                    static if (isArgumentHandler!(typeof(symbol)))
                         __traits(getMember, options, member)(leftOver.front);
                     else
                     {
