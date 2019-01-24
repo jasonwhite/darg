@@ -16,12 +16,10 @@ module darg;
  */
 class ArgParseError : Exception
 {
-    /**
-     */
-    this(string msg) pure nothrow
-    {
-        super(msg);
-    }
+    import std.exception : basicExceptionCtors;
+
+    ///
+    mixin basicExceptionCtors;
 }
 
 /**
@@ -29,10 +27,10 @@ class ArgParseError : Exception
  */
 class ArgParseHelp : Exception
 {
-    this(string msg) pure nothrow
-    {
-        super(msg);
-    }
+    import std.exception : basicExceptionCtors;
+
+    ///
+    mixin basicExceptionCtors;
 }
 
 /**
