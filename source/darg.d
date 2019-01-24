@@ -300,6 +300,16 @@ struct MetaVar
 }
 
 /**
+ * A method that parses the arguments. Can be used for complex multiplicity
+ * arrangements.
+ *
+ * See_also: handleArg
+ */
+struct ArgumentsParser
+{
+}
+
+/**
  * Function signatures that can handle arguments or options.
  */
 private alias void OptionHandler() pure;
@@ -1038,6 +1048,67 @@ enum Config
     default_ = bundling | handleHelp,
 }
 
+protected bool hasCustomArgumentsParser(T)()
+{
+    import std.traits : getUDAs;
+    import std.meta : Alias;
+
+    bool _hasCustomArgumentsParser;
+
+    foreach (member; __traits(allMembers, T))
+    {
+        alias symbol = Alias!(__traits(getMember, T, member));
+        alias argsParserUDAs = getUDAs!(symbol, ArgumentsParser);
+
+        if (argsParserUDAs.length > 0)
+        {
+            assert(!_hasCustomArgumentsParser, "only one @ArgumentsParser allowed");
+
+            _hasCustomArgumentsParser = true;
+        }
+    }
+
+    return _hasCustomArgumentsParser;
+}
+
+/**
+ * Handles `argumentValue` given `OptionArgument` of `options`. This can be
+ * used in a custom `ArgumentsParser` to invoke the default mechanism to
+ * parse an argument.
+ *
+ * Returns: the modified options
+ */
+Options handleArg(string member, Options)(ref Options options, in string argumentValue)
+{
+    import std.traits : getUDAs;
+
+    alias symbol = __traits(getMember, Options, member);
+    enum argUDA = getUDAs!(symbol, Argument)[0];
+
+    // Set argument or add to list of arguments.
+    static if (argUDA.upperBound <= 1)
+    {
+        static if (isArgumentHandler!(typeof(symbol)))
+            __traits(getMember, options, member)(argumentValue);
+        else
+            __traits(getMember, options, member) = parseArg!(typeof(symbol))(argumentValue);
+    }
+    else
+    {
+        static if (isArgumentHandler!(typeof(symbol)))
+            __traits(getMember, options, member)(argumentValue);
+        else
+        {
+            import std.range.primitives : ElementType;
+            __traits(getMember, options, member) ~=
+                parseArg!(ElementType!(typeof(symbol)))(argumentValue);
+        }
+    }
+
+    return options;
+}
+
+
 /**
  * Parses options from the given list of arguments. Note that the first argument
  * is assumed to be the program name and is ignored.
@@ -1049,7 +1120,7 @@ enum Config
 T parseArgs(T)(
         const(string[]) arguments,
         Config config = Config.default_
-        ) pure
+        )
     if (is(T == struct))
 {
     import std.meta : Alias;
@@ -1171,55 +1242,56 @@ T parseArgs(T)(
         .chain(args.tail);
 
     // Only positional arguments are left
-    foreach (member; __traits(allMembers, T))
+    static if (hasCustomArgumentsParser!T)
     {
-        alias symbol = Alias!(__traits(getMember, options, member));
-        alias argUDAs = getUDAs!(symbol, Argument);
-
-        static if (argUDAs.length > 0)
+        // Check for a custom arguments parser
+        foreach (member; __traits(allMembers, T))
         {
-            // Keep consuming arguments until the multiplicity is satisfied
-            for (size_t i = 0; i < argUDAs[0].upperBound; ++i)
+            import std.array : array;
+
+            alias symbol = Alias!(__traits(getMember, options, member));
+            alias argsParserUDAs = getUDAs!(symbol, ArgumentsParser);
+
+            static if (argsParserUDAs.length > 0)
             {
-                // Out of arguments?
-                if (leftOver.empty)
-                {
-                    if (i >= argUDAs[0].lowerBound)
-                        break; // Multiplicity is satisfied
-
-                    throw new ArgParseError(argUDAs[0].multiplicityError(i));
-                }
-
-                // Set argument or add to list of arguments.
-                static if (argUDAs[0].upperBound <= 1)
-                {
-                    static if (isArgumentHandler!(typeof(symbol)))
-                        __traits(getMember, options, member)(leftOver.front);
-                    else
-                        __traits(getMember, options, member) =
-                            parseArg!(typeof(symbol))(leftOver.front);
-                }
-                else
-                {
-                    static if (isArgumentHandler!(typeof(symbol)))
-                        __traits(getMember, options, member)(leftOver.front);
-                    else
-                    {
-                        import std.range.primitives : ElementType;
-                        __traits(getMember, options, member) ~=
-                            parseArg!(ElementType!(typeof(symbol)))(leftOver.front);
-                    }
-                }
-
-                leftOver.popFront();
+                return __traits(getMember, options, member)(leftOver.array);
             }
         }
     }
+    else
+    {
+        // Use default arguments parser
+        foreach (member; __traits(allMembers, T))
+        {
+            alias symbol = Alias!(__traits(getMember, options, member));
+            alias argUDAs = getUDAs!(symbol, Argument);
 
-    if (!leftOver.empty)
-        throw new ArgParseError("Too many arguments specified");
+            static if (argUDAs.length > 0)
+            {
+                // Keep consuming arguments until the multiplicity is satisfied
+                for (size_t i = 0; i < argUDAs[0].upperBound; ++i)
+                {
+                    // Out of arguments?
+                    if (leftOver.empty)
+                    {
+                        if (i >= argUDAs[0].lowerBound)
+                            break; // Multiplicity is satisfied
 
-    return options;
+                        throw new ArgParseError(argUDAs[0].multiplicityError(i));
+                    }
+
+                    // Set argument or add to list of arguments.
+                    handleArg!member(options, leftOver.front);
+                    leftOver.popFront();
+                }
+            }
+        }
+
+        if (!leftOver.empty)
+            throw new ArgParseError("Too many arguments specified");
+
+        return options;
+    }
 }
 
 ///
@@ -1322,4 +1394,123 @@ unittest
             "status",
             ["--asdf", "blah blah"]
             ));
+}
+
+///
+unittest
+{
+    static struct Options
+    {
+        @Option("help")
+        @Help("Prints help on command line usage.")
+        OptionFlag help;
+
+        @Option("version")
+        @Help("Prints version information.")
+        OptionFlag version_;
+
+        @Argument("command")
+        @Help("Command")
+        string command;
+
+        @Argument("subcommand", Multiplicity.optional)
+        @Help("Subcommand")
+        string subcommand;
+
+        @Argument("args", Multiplicity.oneOrMore)
+        @Help("Arguments for the command.")
+        const(string)[] args;
+
+        @ArgumentsParser
+        auto parseArguments(const(string)[] leftOver)
+        {
+            import std.exception : enforce;
+            import std.meta : Alias;
+
+            enforce!ArgParseError(leftOver.length >= 1, "missing command");
+
+            switch (leftOver[0])
+            {
+                case "status":
+                    this.command = leftOver[0];
+                    break;
+                case "list":
+                    this.command = leftOver[0];
+
+                    enforce!ArgParseError(leftOver.length >= 2, "missing subcommand");
+                    switch (leftOver[1])
+                    {
+                        case "options":
+                            this.subcommand = leftOver[1];
+                            break;
+                        default:
+                            throw new ArgParseError("unkown subcommand `" ~ leftOver[1] ~ "`");
+                    }
+                    break;
+                default:
+                    throw new ArgParseError("unkown command `" ~ leftOver[0] ~ "`");
+            }
+
+            auto startIdx = subcommand is null ? 1 : 2;
+
+            foreach (argValue; leftOver[startIdx .. $])
+                handleArg!"args"(this, argValue);
+
+            enforce!ArgParseError(this.args.length >= 1, "missing arguments");
+
+            return this;
+        }
+    }
+
+    immutable options1 = parseArgs!Options([
+            "--version",
+            "status",
+            "arg1",
+            "arg2"
+        ]);
+
+    assert(options1 == Options(
+            OptionFlag.no,
+            OptionFlag.yes,
+            "status",
+            null,
+            ["arg1", "arg2"]
+            ));
+
+    immutable options2 = parseArgs!Options([
+            "list",
+            "options",
+            "opt1",
+            "opt2",
+            "opt3"
+        ]);
+
+    assert(options2 == Options(
+            OptionFlag.no,
+            OptionFlag.no,
+            "list",
+            "options",
+            ["opt1", "opt2", "opt3"]
+            ));
+
+    import std.exception : assertThrown;
+
+    assertThrown!ArgParseError(parseArgs!Options([]));
+    assertThrown!ArgParseError(parseArgs!Options([
+            "list"
+        ]));
+    assertThrown!ArgParseError(parseArgs!Options([
+            "list",
+            "foobar"
+        ]));
+    assertThrown!ArgParseError(parseArgs!Options([
+            "foobar"
+        ]));
+    assertThrown!ArgParseError(parseArgs!Options([
+            "status"
+        ]));
+    assertThrown!ArgParseError(parseArgs!Options([
+            "list",
+            "options"
+        ]));
 }
