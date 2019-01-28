@@ -1080,9 +1080,10 @@ protected bool hasCustomArgumentsParser(T)()
  */
 Options handleArg(string member, Options)(ref Options options, in string argumentValue)
 {
+    import std.meta : Alias;
     import std.traits : getUDAs;
 
-    alias symbol = __traits(getMember, Options, member);
+    alias symbol = Alias!(__traits(getMember, Options, member));
     enum argUDA = getUDAs!(symbol, Argument)[0];
 
     // Set argument or add to list of arguments.
