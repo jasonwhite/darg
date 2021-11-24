@@ -141,7 +141,6 @@ struct Argument
      * default, this is 1.
      */
     this(string name, size_t count = 1) pure nothrow
-    body
     {
         this.name = name;
         this.lowerBound = count;
@@ -154,8 +153,7 @@ struct Argument
      */
     this(string name, size_t lowerBound, size_t upperBound) pure nothrow
     in { assert(lowerBound < upperBound); }
-    body
-    {
+    do {
         this.name = name;
         this.lowerBound = lowerBound;
         this.upperBound = upperBound;
